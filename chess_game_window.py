@@ -395,9 +395,9 @@ class Chess:
     def castling_context(self, e, n):
         # castling 1. check: only Rooks respond to right click
         if 'T' in self.c_chess.gettags(self.c_chess.find_withtag(f'piece_{n}')):
-            print('These rook and king moved so far:')
-            print(self.these_rook_king_moved)
             print('castling requested with rook_' + str(n))
+            print('These (rook and) king moved so far:')
+            print(self.these_rook_king_moved)
             print('This rook moved:')
             print(n in self.these_rook_king_moved)
             self.king_position = None
@@ -413,12 +413,37 @@ class Chess:
                 self.castling_menu.post(e.x_root, e.y_root)
 
     def castling(self):
+        def empty_space_between_king_rook():
+            if self.castling_rook[0] == 'h':
+                if self.chess_board['g' + self.castling_rook[1]] == '  ' and \
+                        self.chess_board['f' + self.castling_rook[1]] == '  ':
+                    return True
+            elif self.castling_rook[0] == 'a':
+                if self.chess_board['b' + self.castling_rook[1]] == '  ' and \
+                        self.chess_board['c' + self.castling_rook[1]] == '  ' and \
+                        self.chess_board['d' + self.castling_rook[1]] == '  ':
+                    return True
+            return False
+
+        def king_castling_safe():
+            if self.castling_rook[0] == 'h':
+                if self.coord_danger_from(self.king_position, self.chess_board, self.current_player) or\
+                        self.coord_danger_from('f' + self.king_position[1], self.chess_board, self.current_player) or \
+                        self.coord_danger_from('g' + self.king_position[1], self.chess_board, self.current_player):
+                    return False
+            elif self.castling_rook[0] == 'a':
+                if self.coord_danger_from(self.king_position, self.chess_board, self.current_player) or\
+                        self.coord_danger_from('d' + self.king_position[1], self.chess_board, self.current_player) or \
+                        self.coord_danger_from('c' + self.king_position[1], self.chess_board, self.current_player):
+                    return False
+            return True
+
         def modify_rook_king(color):
             rook_id = self.c_chess.find_withtag(f'piece_{self.castling_rook}')
             self.c_chess.itemconfigure(rook_id, fill=self.txt_map_color(self.current_player)[color])
             king_id = self.c_chess.find_withtag(f'piece_{self.king_position}')
             self.c_chess.itemconfigure(king_id, fill=self.txt_map_color(self.current_player)[color])
-            return rook_id, king_id  # also extracts object id
+            return rook_id, king_id     # also extracts object id
 
         def get_row_col(color, k_col):
             if color == 'w':
@@ -436,30 +461,50 @@ class Chess:
             self.chess_board[self.king_position] = '  '
             self.chess_board[get_row_col(color, k_col)[1] + get_row_col(color, k_col)[0]] = color + 'T'
             self.chess_board[self.castling_rook] = '  '
+            self.these_rook_king_moved.append(k_col + self.king_position[1])
 
-        def gui_castling(color, k_col):
-            self.c_chess.coords(modify_rook_king(0)[0],  # setting color back together with return id
+        def gui_castling(color, k_col):     # moving and updating tag
+            self.c_chess.coords(modify_rook_king(0)[0],     # setting color back together with return id
                                 self.get_square_center(get_row_col(color, k_col)[1] + get_row_col(color, k_col)[0]))
             self.c_chess.coords(modify_rook_king(0)[1],  # setting color back together with return id
                                 self.get_square_center(k_col + get_row_col(color, k_col)[0]))
+            self.c_chess.itemconfigure(self.c_chess.find_withtag(f'piece_{self.castling_rook}'),
+                                       tag=('piece',
+                                            color,
+                                            'piece_' + get_row_col(color, k_col)[1] + get_row_col(color, k_col)[0],
+                                       'T'))  # update tag of piece
+            self.c_chess.itemconfigure(self.c_chess.find_withtag(f'piece_{self.king_position}'),
+                                       tag=('piece',
+                                            color,
+                                            'piece_' + k_col + get_row_col(color, k_col)[0]))
 
-        modify_rook_king(1)
-        print('castling with rook_' + self.castling_rook)
-
-        if self.castling_rook[0] == 'h':
-            message = 'Proceed with kingside castling?'
-            side = 'g'
+        # castling 3. check: castling dialog only appears if squares empty between king and chosen rook
+        if not empty_space_between_king_rook():
+            tk.messagebox.showwarning(title='Castling',
+                                      message='Piece present between king and choosen rook!')
         else:
-            message = 'Proceed with queenside castling?'
-            side = 'c'
-        do_castling = tk.messagebox.askyesno(title='Castling', message=message, detail='-reserved-')
-        if do_castling:
-            backend_castling(self.current_player, side)
-            gui_castling(self.current_player, side)
-            self.currently_selected.set('exit')  # to bypass anticipated position1 and flip player
-            self.display_board()
-        else:
-            modify_rook_king(0)
+            modify_rook_king(1)
+            if self.castling_rook[0] == 'h':
+                message = 'Proceed with kingside castling?'
+                side = 'g'
+            else:
+                message = 'Proceed with queenside castling?'
+                side = 'c'
+            do_castling = tk.messagebox.askyesno(title='Castling', message=message, detail='-reserved-')
+            if do_castling:
+                # castling 4. check: castling happens only if king not in check during castling
+                if not king_castling_safe():
+                    tk.messagebox.showwarning(title='Castling',
+                                              message='King in check during castling!')
+                    modify_rook_king(0)
+                else:
+                    print('castling with rook_' + self.castling_rook)
+                    backend_castling(self.current_player, side)
+                    gui_castling(self.current_player, side)
+                    self.currently_selected.set('exit')     # to bypass anticipated position1 and flip player
+                    self.display_board()
+            else:
+                modify_rook_king(0)
 
     def handle_turn(self, x):
         self.selected_piece = None
@@ -750,7 +795,7 @@ class Chess:
                 return True
             return False
 
-    # check analysis form here
+    # check analysis from here
     def virtual_move_results_check(self, x):
         chess_board_virtual = self.chess_board.copy()  # shallow copy
         chess_board_virtual[self.position2] = chess_board_virtual[self.position1]
