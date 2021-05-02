@@ -29,17 +29,21 @@ class Chess:
         # font parameters (size 20 for 1366x768)
         self.font = {'size': int(self.square_size / 3.5), 'color': 'black', 'type': 'TKDefaultFont'}
 
-        self.chess_board = {}
+        self.chess_board = {}                           # game save values start
         self.captured_pieces = {}
         self.current_player = None
         self.current_player2 = None
         self.other_player = None
         self.these_rook_king_moved = []
         self.en_pass_pos = None
+        self.number_of_player = tk.IntVar(value=2)      # game save values end
+        self.chess_board_keys = None
+        self.c_chess = None
         self.currently_selected = tk.StringVar()
         self.show_legal_moves = tk.BooleanVar(value=True)
-        self.number_of_player = tk.IntVar(value=2)
         self.file_to_load = 'initial_setup.txt'
+        self.c = {}      # dictionary for gui elements created later and used for multiple methods
+        self.bak = {}    # dictionary for backups
         self.position1 = None
         self.position2 = None
         self.selected_piece = None
@@ -107,14 +111,14 @@ class Chess:
         except IndexError:
             print('Game file is corrupted!')
             tk.messagebox.showerror(title='Error', message='Game file is corrupted!')
-            self.chess_board = self.chess_board_c.copy()    # restoring backups
-            self.captured_pieces = self.captured_pieces_c.copy()
-            self.current_player = self.current_player_c
-            self.current_player2 = self.current_player2_c
-            self.other_player = self.other_player_c
-            self.these_rook_king_moved = self.these_rook_king_moved_c.copy()
-            self.en_pass_pos = self.en_pass_pos_c.copy()
-            self.number_of_player = self.number_of_player_c
+            self.chess_board = self.bak['chess_board'].copy()    # restoring backups
+            self.captured_pieces = self.bak['captured_pieces'].copy()
+            self.current_player = self.bak['current_player']
+            self.current_player2 = self.bak['current_player2']
+            self.other_player = self.bak['other_player']
+            self.these_rook_king_moved = self.bak['these_rook_king_moved'].copy()
+            self.en_pass_pos = self.bak['en_pass_pos'].copy()
+            self.number_of_player = self.bak['number_of_player']
 
     def display_board(self):
         print('-----------------------------------------------')
@@ -154,22 +158,22 @@ class Chess:
 
     def draw_menu(self):
         self.master.option_add('*tearOff', False)
-        self.chess_menu = tk.Menu(self.master)
-        self.master['menu'] = self.chess_menu
-        self.file_menu = tk.Menu(self.chess_menu)
-        self.options_menu = tk.Menu(self.chess_menu)
-        self.chess_menu.add_cascade(label='File', menu=self.file_menu, underline=0)
-        self.chess_menu.add_cascade(label='Options', menu=self.options_menu, underline=0)
-        self.file_menu.add_command(label='New Game', command=self.new_game)
-        self.file_menu.add_command(label='Load Game', command=self.load_game)
-        self.file_menu.add_command(label='Save Game', command=self.save_game)
-        self.file_menu.add_separator()
-        self.file_menu.add_command(label='Exit', command=self.exit_game)
-        self.options_menu.add_command(label='Board size')
-        self.options_menu.add_command(label='Settings', command=self.settings_dialog)
+        main_menu = tk.Menu(self.master)
+        self.master['menu'] = main_menu
+        file_menu = tk.Menu(main_menu)
+        options_menu = tk.Menu(main_menu)
+        main_menu.add_cascade(label='File', menu=file_menu, underline=0)
+        main_menu.add_cascade(label='Options', menu=options_menu, underline=0)
+        file_menu.add_command(label='New Game', command=self.new_game)
+        file_menu.add_command(label='Load Game', command=self.load_game)
+        file_menu.add_command(label='Save Game', command=self.save_game)
+        file_menu.add_separator()
+        file_menu.add_command(label='Exit', command=self.exit_game)
+        options_menu.add_command(label='Board size')
+        options_menu.add_command(label='Settings', command=self.settings_dialog)
 
-        self.castling_menu = tk.Menu(self.master)   # context menu
-        self.castling_menu.add_command(label='Castling', command=self.castling)
+        self.c['castling_menu'] = tk.Menu(self.master)   # context menu
+        self.c['castling_menu'].add_command(label='Castling', command=self.castling)
 
         self.master.protocol("WM_DELETE_WINDOW", lambda: self.exit_game())  # intercepting close button
 
@@ -184,14 +188,14 @@ class Chess:
     def load_game(self):
         path = tk.filedialog.askopenfilename(filetypes=[('Text Documents', '*.txt')])
         if path:
-            self.chess_board_c = self.chess_board.copy()  # saving backups
-            self.captured_pieces_c = self.captured_pieces.copy()
-            self.current_player_c = self.current_player
-            self.current_player2_c = self.current_player2
-            self.other_player_c = self.other_player
-            self.these_rook_king_moved_c = self.these_rook_king_moved.copy()
-            self.en_pass_pos_c = self.en_pass_pos.copy()
-            self.number_of_player_c = self.number_of_player
+            self.bak['chess_board'] = self.chess_board.copy()  # saving backups
+            self.bak['captured_pieces'] = self.captured_pieces.copy()
+            self.bak['current_player'] = self.current_player
+            self.bak['current_player2'] = self.current_player2
+            self.bak['other_player'] = self.other_player
+            self.bak['these_rook_king_moved'] = self.these_rook_king_moved.copy()
+            self.bak['en_pass_pos'] = self.en_pass_pos.copy()
+            self.bak['number_of_player'] = self.number_of_player
             self.game_still_going = False
             self.file_to_load = path
             self.currently_selected.set('exit')
@@ -277,32 +281,32 @@ class Chess:
         settings_window.destroy()
 
     def draw_4_main_canvas(self):
-        self.c_left_side = self.screen_size[1] - 100  # 92 plus 3 + 5
-        self.c_right_width = self.screen_size[0] - self.c_left_side - 24  # 2blue edge,12separator, 5,5 pad x
-        self.c_right_center_height = self.c_left_side / 4
-        self.c_right_top_height = (self.c_left_side - self.c_right_center_height - 24) / 2  # 12 x 2 separator
+        self.c['left_side'] = self.screen_size[1] - 100  # 92 plus 3 + 5
+        self.c['right_width'] = self.screen_size[0] - self.c['left_side'] - 24  # 2blue edge,12separator, 5,5 pad x
+        c_right_center_height = self.c['left_side'] / 4
+        self.c['right_top_height'] = (self.c['left_side'] - c_right_center_height - 24) / 2  # 12 x 2 separator
 
-        self.c_left = tk.Canvas(self.master, width=self.c_left_side, height=self.c_left_side)
-        self.c_right_top = tk.Canvas(self.master, width=self.c_right_width, height=self.c_right_top_height)
-        self.c_right_bottom = tk.Canvas(self.master, width=self.c_right_width, height=self.c_right_top_height)
-        self.c_right_center = tk.Canvas(self.master, width=self.c_right_width, height=self.c_right_center_height)
-        for canvas_item in [self.c_left, self.c_right_top, self.c_right_bottom, self.c_right_center]:
+        self.c['left'] = tk.Canvas(self.master, width=self.c['left_side'], height=self.c['left_side'])
+        self.c['right_top'] = tk.Canvas(self.master, width=self.c['right_width'], height=self.c['right_top_height'])
+        self.c['right_bottom'] = tk.Canvas(self.master, width=self.c['right_width'], height=self.c['right_top_height'])
+        self.c['right_center'] = tk.Canvas(self.master, width=self.c['right_width'], height=c_right_center_height)
+        for canvas_item in [self.c['left'], self.c['right_top'], self.c['right_bottom'], self.c['right_center']]:
             canvas_item['bg'] = self.canvas_color['light']
             canvas_item['highlightthickness'] = 0
-        self.separator1 = ttk.Separator(self.master, orient='vertical')
-        self.separator2 = ttk.Separator(self.master, orient='horizontal')
-        self.separator3 = ttk.Separator(self.master, orient='horizontal')
+        separator1 = ttk.Separator(self.master, orient='vertical')
+        separator2 = ttk.Separator(self.master, orient='horizontal')
+        separator3 = ttk.Separator(self.master, orient='horizontal')
 
-        self.c_left.grid(column=0, row=0, columnspan=1, rowspan=5, padx=5, pady=(3, 0))
-        self.separator1.grid(column=1, row=0, columnspan=1, rowspan=5, sticky='n, s')
-        self.c_right_top.grid(column=2, row=0, padx=(5, 0), pady=(3, 5))
-        self.separator2.grid(column=2, row=1, sticky='w, e')
-        self.c_right_center.grid(column=2, row=2, padx=(5, 0), pady=5)
-        self.separator3.grid(column=2, row=3, sticky='w, e')
-        self.c_right_bottom.grid(column=2, row=4, padx=(5, 0), pady=(5, 0))
+        self.c['left'].grid(column=0, row=0, columnspan=1, rowspan=5, padx=5, pady=(3, 0))
+        separator1.grid(column=1, row=0, columnspan=1, rowspan=5, sticky='n, s')
+        self.c['right_top'].grid(column=2, row=0, padx=(5, 0), pady=(3, 5))
+        separator2.grid(column=2, row=1, sticky='w, e')
+        self.c['right_center'].grid(column=2, row=2, padx=(5, 0), pady=5)
+        separator3.grid(column=2, row=3, sticky='w, e')
+        self.c['right_bottom'].grid(column=2, row=4, padx=(5, 0), pady=(5, 0))
 
-        self.current_player_label = self.c_right_center.create_text(
-            self.c_right_width / 2, self.c_right_center_height / 2,
+        self.c['current_player_label'] = self.c['right_center'].create_text(
+            self.c['right_width'] / 2, c_right_center_height / 2,
             text='White is next to move', fill=self.font['color'],
             font=(self.font['type'], self.font['size']))
 
@@ -310,56 +314,52 @@ class Chess:
         self.master.bind('<Escape>', lambda e: self.reset_selection())
 
     def draw_chess_board(self):
-        self.c_123abc_w = (self.c_left_side - self.square_size * 8) / 2  # strip width of 1-8, a-h
+        notation_strip_width = (self.c['left_side'] - self.square_size * 8) / 2
 
-        self.c_chess = tk.Canvas(self.c_left, width=self.square_size * 8, height=self.square_size * 8,
+        self.c_chess = tk.Canvas(self.c['left'], width=self.square_size * 8, height=self.square_size * 8,
                                  bg=self.canvas_color['light'])
 
-        self.board_abcx2 = {}  # creating two rows of letters a-h
-        for i in ['n', 's']:
-            self.board_abcx2[i] = tk.Canvas(self.c_left, width=self.square_size * 8,
-                                            height=self.c_123abc_w, bg=self.canvas_color['medium'])
+        for i in ['abc_n', 'abc_s']:  # creating two rows of letters a-h
+            self.c[i] = tk.Canvas(self.c['left'], width=self.square_size * 8,
+                                  height=notation_strip_width, bg=self.canvas_color['medium'])
             for j in char_range('a', 'h'):
-                self.board_abcx2[i].create_text(
-                    self.square_size * (ord(j) - 96.5), self.c_123abc_w / 2,
+                self.c[i].create_text(
+                    self.square_size * (ord(j) - 96.5), notation_strip_width / 2,
                     text=j, fill=self.font['color'], font=(self.font['type'], self.font['size']))
 
-        self.board_123x2 = {}  # creating two columns of numbers 1-8
-        for i in ['w', 'e']:
-            self.board_123x2[i] = tk.Canvas(self.c_left, width=self.c_123abc_w,
-                                            height=self.c_left_side, bg=self.canvas_color['medium'])
+        for i in ['123_w', '123_e']:  # creating two columns of numbers 1-8
+            self.c[i] = tk.Canvas(self.c['left'], width=notation_strip_width,
+                                  height=self.c['left_side'], bg=self.canvas_color['medium'])
             for j in range(0, 8):
-                self.board_123x2[i].create_text(
-                    self.c_123abc_w / 2, self.c_left_side - self.c_123abc_w - self.square_size * (j + 0.5),
+                self.c[i].create_text(
+                    notation_strip_width / 2, self.c['left_side'] - notation_strip_width - self.square_size * (j + 0.5),
                     text=j + 1, fill=self.font['color'], font=(self.font['type'], self.font['size']))
 
-        for canvas_item in [self.c_chess, self.board_abcx2['n'], self.board_abcx2['s'],
-                            self.board_123x2['w'], self.board_123x2['e']]:
+        for canvas_item in [self.c_chess, self.c['abc_n'], self.c['abc_s'], self.c['123_w'], self.c['123_e']]:
             canvas_item['highlightthickness'] = 0
 
-        self.board_123x2['w'].grid(column=0, row=0, rowspan=3)
-        self.board_abcx2['n'].grid(column=1, row=0)
+        self.c['123_w'].grid(column=0, row=0, rowspan=3)
+        self.c['abc_n'].grid(column=1, row=0)
         self.c_chess.grid(column=1, row=1)
-        self.board_abcx2['s'].grid(column=1, row=2)
-        self.board_123x2['e'].grid(column=2, row=0, rowspan=3)
+        self.c['abc_s'].grid(column=1, row=2)
+        self.c['123_e'].grid(column=2, row=0, rowspan=3)
 
     def draw_captured_areas(self):
-        self.c_captured = {}  # creating two areas for captured pieces
-        for color, parent in [('w', self.c_right_bottom), ('b', self.c_right_top)]:
-            self.c_captured[color] = tk.Canvas(parent, width=self.square_size * 8,
-                                               height=self.square_size * 2, bg=self.canvas_color['medium'],
-                                               highlightthickness=0)
-        for color, y in [('b', self.square_size), ('w', self.c_right_top_height - self.square_size * 3)]:
-            self.c_captured[color].place(anchor='n',
-                                         x=self.c_right_width / 2, y=y)
+        self.c['captured'] = {}  # creating two areas for captured pieces
+        for color, parent, y in [('w', self.c['right_bottom'], self.c['right_top_height'] - self.square_size * 3),
+                                 ('b', self.c['right_top'], self.square_size)]:
+            self.c['captured'][color] = tk.Canvas(parent, width=self.square_size * 8,
+                                                  height=self.square_size * 2, bg=self.canvas_color['medium'],
+                                                  highlightthickness=0)
+            self.c['captured'][color].place(anchor='n', x=self.c['right_width'] / 2, y=y)
 
-        self.c_right_top.create_text(self.c_right_width / 2, self.square_size / 2,
-                                     text='Captured black pieces', fill=self.font['color'],
-                                     font=(self.font['type'], self.font['size']))
-
-        self.c_right_bottom.create_text(self.c_right_width / 2, self.c_right_top_height - self.square_size / 2,
-                                        text='Captured white pieces', fill=self.font['color'],
+        self.c['right_top'].create_text(self.c['right_width'] / 2, self.square_size / 2,
+                                        text='Captured black pieces', fill=self.font['color'],
                                         font=(self.font['type'], self.font['size']))
+
+        self.c['right_bottom'].create_text(self.c['right_width'] / 2, self.c['right_top_height'] - self.square_size / 2,
+                                           text='Captured white pieces', fill=self.font['color'],
+                                           font=(self.font['type'], self.font['size']))
 
     def draw_captured_pieces(self):
         def get_captured_center(number):
@@ -373,7 +373,7 @@ class Chess:
 
         for color in ['b', 'w']:
             for i in range(0, 16):
-                self.c_captured[color].create_text(
+                self.c['captured'][color].create_text(
                     get_captured_center(i),
                     text=self.txt_map_piece(self.captured_pieces[color][i][1]),
                     tag=f'captured_{str(i)}',
@@ -382,7 +382,7 @@ class Chess:
                     font=(self.font['type'], self.piece_size),
                     state=tk.DISABLED)
         # for i in range(1, 17):
-        #     print(self.c_captured['w'].gettags(i))
+        #     print(self.c['captured']['w'].gettags(i))
 
     def pos_map_color(self, pos):
         if (ord(pos[0]) + int(pos[1])) % 2 == 0:  # True if dark square, False if light square
@@ -477,7 +477,7 @@ class Chess:
             self.castling_rook = n
             # castling 2. check: menu appears only if selected Rook and current player King hasn't moved so far
             if self.king_position not in self.these_rook_king_moved and n not in self.these_rook_king_moved:
-                self.castling_menu.post(e.x_root, e.y_root)
+                self.c['castling_menu'].post(e.x_root, e.y_root)
 
     def castling(self):
         def empty_space_between_king_rook():
@@ -574,8 +574,8 @@ class Chess:
             first_empty_slot = self.captured_pieces[self.other_player].index('  ')
             self.captured_pieces[self.other_player][first_empty_slot] = self.chess_board[self.en_pass_pos[1]]
             # copy captured piece to captured canvas
-            self.c_captured[self.other_player].itemconfigure(
-                self.c_captured[self.other_player].find_withtag('captured_' + str(first_empty_slot)),
+            self.c['captured'][self.other_player].itemconfigure(
+                self.c['captured'][self.other_player].find_withtag('captured_' + str(first_empty_slot)),
                 text=self.txt_map_piece(self.chess_board[self.en_pass_pos[1]][1]))
             # get id of captured piece
             captured_piece = self.c_chess.find_withtag(f'piece_{self.en_pass_pos[1]}')
@@ -605,10 +605,10 @@ class Chess:
         #     print(self.c_chess.gettags(i))
         if x == 'w':
             print('White is next to move')
-            self.c_right_center.itemconfigure(self.current_player_label, text='White is next to move')
+            self.c['right_center'].itemconfigure(self.c['current_player_label'], text='White is next to move')
         elif x == 'b':
             print('Black is next to move')
-            self.c_right_center.itemconfigure(self.current_player_label, text='Black is next to move')
+            self.c['right_center'].itemconfigure(self.c['current_player_label'], text='Black is next to move')
 
         self.c_chess.itemconfigure('piece', state=tk.DISABLED)  # initialize select piece
         self.c_chess.itemconfigure('square', state=tk.DISABLED)
@@ -647,8 +647,8 @@ class Chess:
                         # backend, copying position2 piece to other player's captured list
                         self.captured_pieces[self.other_player][first_empty_slot] = self.chess_board[self.position2]
                         # copy captured piece to captured canvas
-                        self.c_captured[self.other_player].itemconfigure(
-                            self.c_captured[self.other_player].find_withtag('captured_' + str(first_empty_slot)),
+                        self.c['captured'][self.other_player].itemconfigure(
+                            self.c['captured'][self.other_player].find_withtag('captured_' + str(first_empty_slot)),
                             text=self.txt_map_piece(self.chess_board[self.position2][1]))
                         # get id of captured piece
                         captured_piece = self.c_chess.find_withtag(f'piece_{self.position2}')
