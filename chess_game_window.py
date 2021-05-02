@@ -37,6 +37,11 @@ class Chess:
         self.dark_piece_highlight = self.dark_squares_highlight
         self.piece_size = int(self.font_size*2.5)
 
+        self.currently_selected = tk.StringVar()
+        self.position1 = '  '
+        self.position2 = '  '
+        self.game_still_going = True
+
         self.generate_board()
         self.load_initial_setup()
         self.draw_menu()
@@ -44,6 +49,7 @@ class Chess:
         self.draw_chess_board()
         self.draw_squares()
         self.draw_pieces()
+        self.play_dual()
 
     def generate_board(self):
         self.chess_keys = []
@@ -57,12 +63,12 @@ class Chess:
         # print(self.chess_board)
 
     def load_initial_setup(self):
-        self.file = open('initial_setup.txt', 'r')
-        self.data = self.file.read().splitlines()
-        for line in self.data:
+        file = open('initial_setup.txt', 'r')
+        data = file.read().splitlines()
+        for line in data:
             (key, value) = line.split('=')
             self.chess_board[key] = value
-        self.file.close()
+        file.close()
         # print(self.chess_board)
 
     def draw_menu(self):
@@ -145,15 +151,15 @@ class Chess:
                 color = self.light_squares_color
                 act_color = self.light_squares_highlight
             self.c_chess.create_rectangle(x0, y0, x1, y1, fill=color, width=0,
-                                          activefill=act_color, tag=('square', i))
+                                          activefill=act_color, tag=('square', 'square_' + i))
             # e not used but always created as event, so a new kw parameter n is created which is local to lambda
-            self.c_chess.tag_bind(i, '<Button-1>', lambda e, n=i: print(n))
+            self.c_chess.tag_bind('square_' + i, '<Button-1>', lambda e, n=i: self.currently_selected.set(n))
 
     def get_center(self, tag):
-        x0 = self.c_chess.coords(self.c_chess.find_withtag(tag))[0]
-        y0 = self.c_chess.coords(self.c_chess.find_withtag(tag))[1]
-        x1 = self.c_chess.coords(self.c_chess.find_withtag(tag))[2]
-        y1 = self.c_chess.coords(self.c_chess.find_withtag(tag))[3]
+        x0 = self.c_chess.coords(self.c_chess.find_withtag('square_' + tag))[0]
+        y0 = self.c_chess.coords(self.c_chess.find_withtag('square_' + tag))[1]
+        x1 = self.c_chess.coords(self.c_chess.find_withtag('square_' + tag))[2]
+        y1 = self.c_chess.coords(self.c_chess.find_withtag('square_' + tag))[3]
         xc = (x0 + x1) / 2
         yc = (y0 + y1) / 2
         return xc, yc
@@ -178,16 +184,47 @@ class Chess:
         elif txt == 'b':
             return self.dark_piece_color, self.dark_piece_highlight
 
-    def draw_pieces(self):
+    def draw_pieces(self):      # the pieces are already bound to button1 via their tags during draw_squares
         for i in self.chess_board:
             if self.chess_board[i] != '  ':
                 self.c_chess.create_text(
                     self.get_center(i),
                     text=self.txt_map_piece(self.chess_board[i][1]),
-                    tag=('piece', i),
+                    tag=('piece', 'piece_' + i),
                     fill=self.txt_map_color(self.chess_board[i][0])[0],
                     activefill=self.txt_map_color(self.chess_board[i][0])[1],
                     font=(self.font_type, self.piece_size))
+            self.c_chess.tag_bind('piece_' + i, '<Button-1>', lambda e, n=i: self.currently_selected.set(n))
+
+    def play_dual(self):
+        while self.game_still_going:
+            self.handle_turn()
+
+    def handle_turn(self):
+        # white is next
+        self.c_chess.itemconfigure('piece', state=tk.NORMAL)
+        self.c_chess.itemconfigure('square', state=tk.DISABLED)
+        print('waiting for position1')
+        self.c_chess.wait_variable(self.currently_selected)
+        self.position1 = self.currently_selected.get()
+        print('position1=' + self.position1)
+        selected_piece = self.c_chess.find_withtag(f'piece_{self.position1}')   # get id of selected piece
+        print('id=' + str(selected_piece))
+
+        self.c_chess.itemconfigure('square', state=tk.NORMAL)
+        self.c_chess.itemconfigure('piece', state=tk.DISABLED)
+        print('waiting for position2')
+        self.c_chess.wait_variable(self.currently_selected)
+        self.position2 = self.currently_selected.get()
+        print('position2=' + self.position2)
+
+        self.c_chess.coords(selected_piece, self.get_center(self.position2))    # movement of piece
+        # lekerdezzuk a tagjait amivel leptunk
+        print('old tags=' + str(self.c_chess.gettags(selected_piece)))
+        # megváltozatjuk a tagjet
+        self.c_chess.itemconfigure(selected_piece, tag=('piece', f'piece_{self.position2}'))
+        # lekerdezzuk ujra
+        print('new tags=' + str(self.c_chess.gettags(selected_piece)))
 
 
 if __name__ == '__main__':
