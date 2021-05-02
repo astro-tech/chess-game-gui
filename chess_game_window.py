@@ -604,13 +604,13 @@ class Chess:
             self.master.after(curr_speed * 2, lambda: self.c_chess.delete(captured_piece))
             self.chess_board[self.en_pass_pos[1]] = '  '
         if x == 'w':
-            if self.chess_board[self.position1][1] == 'i' and self.position2[1] == '4':
+            if self.chess_board[self.position1][1] == 'i' and self.position1[1] == '2' and self.position2[1] == '4':
                 self.en_pass_pos[0] = self.position2[0] + str(3)
                 self.en_pass_pos[1] = self.position2
             else:
                 self.en_pass_pos = ['  ', '  ']
         elif x == 'b':
-            if self.chess_board[self.position1][1] == 'i' and self.position2[1] == '5':
+            if self.chess_board[self.position1][1] == 'i' and self.position1[1] == '7' and self.position2[1] == '5':
                 self.en_pass_pos[0] = self.position2[0] + str(6)
                 self.en_pass_pos[1] = self.position2
             else:
@@ -736,9 +736,9 @@ class Chess:
                                  self.coord_danger_from(i, board1, player)]
             dgr_values_after = [values[board2[i][1]] for i in self.chess_board_keys if board2[i][0] == player and
                                 self.coord_danger_from(i, board2, player)]
-            print(dgr_values_before, end=',')
-            print(dgr_values_after, end=',')
-            print(player + ',' + str(ops[comp](sum(dgr_values_before), sum(dgr_values_after))))
+            # print(dgr_values_before, end=',')
+            # print(dgr_values_after, end=',')
+            # print(player + ',' + str(ops[comp](sum(dgr_values_before), sum(dgr_values_after))))
             return {'r': ops[comp](sum(dgr_values_before), sum(dgr_values_after)),
                     'b': sum(dgr_values_before), 'a': sum(dgr_values_after)}
 
@@ -782,6 +782,7 @@ class Chess:
                                     [x + 'T', x + 'f', x + 'A', x + '+', x + '*', x + 'i'] \
                                     and self.check_legal_move() and not self.virtual_move_results_check(x) and \
                                     not self.coord_danger_from(self.position2, self.chess_board_virtual, x) and \
+                                    not self.move_danger_from_en_passant(self.chess_board) and \
                                     piece_dgr_values_check(self.chess_board, self.chess_board_virtual, x, '>=')['r']:
                                 strategy_found = True
                                 strategy = '3: Retreating to safe place'
@@ -826,7 +827,7 @@ class Chess:
         # if not under attack or move not found, it tries the en passant capture (7th)
         if not strategy_found and self.en_pass_pos[0] != '  ':
             self.position1 = self.coord_danger_from(self.en_pass_pos[0], self.chess_board, self.other_player)
-            if self.position1 and self.position1[1] == 'i':
+            if self.position1 and self.chess_board[self.position1][1] == 'i':
                 self.position2 = self.en_pass_pos[0]
                 strategy_found = True
                 strategy = '7: Attack with En passant'
@@ -847,7 +848,8 @@ class Chess:
             for self.position1 in randomized_curr_player_pos:
                 for self.position2 in dist_ordered_pos2s:
                     if self.check_legal_move() and not self.virtual_move_results_check(x) and \
-                            piece_dgr_values_check(self.chess_board, self.chess_board_virtual, x, '>=')['r']:
+                            piece_dgr_values_check(self.chess_board, self.chess_board_virtual, x, '>=')['r'] and \
+                            not self.move_danger_from_en_passant(self.chess_board):
                         eight[(self.position1, self.position2)] = piece_dgr_values_check(   # value assign to moves
                             self.chess_board, self.chess_board_virtual, self.other_player, '<')['a']
             sorted_eight = sorted(eight.items(), key=lambda i: i[1], reverse=True)  # if eight still empty, returns []
@@ -863,7 +865,8 @@ class Chess:
                 for self.position1 in randomized_curr_player_pos:
                     for self.position2 in dist_ordered_pos2s:
                         if self.check_legal_move() and not self.virtual_move_results_check(x) and \
-                                piece_dgr_values_check(self.chess_board, self.chess_board_virtual, x, '>=')['r']:
+                                piece_dgr_values_check(self.chess_board, self.chess_board_virtual, x, '>=')['r'] and \
+                                not self.move_danger_from_en_passant(self.chess_board):
                             strategy_found = True
                             strategy = '9: Move to safe place'
                             break
@@ -1154,9 +1157,7 @@ class Chess:
                     return i
 
     def coord_danger_from_king_knight(self, xn, board, x, xy, piece):
-        possible_coordinates = []
-        for a, b in xy:
-            possible_coordinates.append(chr(ord(xn[0]) + a) + str(int(xn[1]) + b))
+        possible_coordinates = [chr(ord(xn[0]) + a) + str(int(xn[1]) + b) for a, b in xy]
         threat_coordinates = list(set(possible_coordinates).intersection(set(self.chess_board_keys)))
         if x == 'w':
             for i in threat_coordinates:
@@ -1168,13 +1169,24 @@ class Chess:
                     return i
 
     def coord_danger_from_pawn(self, xn, board, xy, color):
-        possible_coordinates = []
-        for a, b in xy:
-            possible_coordinates.append(chr(ord(xn[0]) + a) + str(int(xn[1]) + b))
+        possible_coordinates = [chr(ord(xn[0]) + a) + str(int(xn[1]) + b) for a, b in xy]
         threat_coordinates = list(set(possible_coordinates).intersection(set(self.chess_board_keys)))
         for i in threat_coordinates:
             if board[i] == color + 'i':
                 return i
+
+    def move_danger_from_en_passant(self, board):
+        def check(cur, pos1, pos2, oth):
+            if board[self.position1] == cur and self.position1[1] == pos1 and self.position2[1] == pos2:
+                possible_coordinates = [chr(ord(self.position2[0]) + a) + self.position2[1] for a in [1, -1]]
+                threat_coordinates = list(set(possible_coordinates).intersection(set(self.chess_board_keys)))
+                for i in threat_coordinates:
+                    if board[i] == oth:
+                        return i
+        attacker = check('wi', '2', '4', 'bi')
+        if not attacker:
+            attacker = check('bi', '7', '5', 'wi')
+        return attacker
 
     def check_if_game_still_going(self, x):
         if self.currently_selected.get() != 'exit':
