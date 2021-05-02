@@ -803,8 +803,9 @@ class Chess:
                             else:
                                 continue
                 break
+        # the following was moved out of if statement, due later usage and medium warning
+        oth_player_pos = [i for i in self.chess_board_keys if self.chess_board[i][0] == self.other_player]
         if not strategy_found:  # if not under attack or move not found, it tries to attack (5, 6, 7)
-            oth_player_pos = [i for i in self.chess_board_keys if self.chess_board[i][0] == self.other_player]
             print("Opponent's pieces standing on: " + str(oth_player_pos))
             self.piece_dgr['oth'] = {i: self.chess_board[i] for i in oth_player_pos if
                                      self.coord_danger_from(i, self.chess_board, self.other_player)}
@@ -846,22 +847,28 @@ class Chess:
             dist_add_pos2s = {pos: measure_dist(oth_king_pos, pos) for pos in safe_position2s}
             dist_ordered_pos2s = [pos for i in range(1, 101) for pos in dist_add_pos2s if dist_add_pos2s[pos] == i / 10]
             randomized_curr_player_pos = random.sample(curr_player_pos, len(curr_player_pos))
-            eight = {}
-            for self.position1 in randomized_curr_player_pos:
-                for self.position2 in dist_ordered_pos2s:
-                    if self.check_legal_move() and not self.virtual_move_results_check(x) and \
-                            piece_dgr_values_check(self.chess_board, self.chess_board_virtual, x, '>=')['r'] and \
-                            not self.move_danger_from_en_passant(self.chess_board):
-                        eight[(self.position1, self.position2)] = piece_dgr_values_check(   # value assign to moves
-                            self.chess_board, self.chess_board_virtual, self.other_player, '<')['a']
-            sorted_eight = sorted(eight.items(), key=lambda i: i[1], reverse=True)  # if eight still empty, returns []
-            if sorted_eight and sorted_eight[0][1] > piece_dgr_values_check(    # if greatest value after > before
-                    self.chess_board, self.chess_board_virtual, self.other_player, '<')['b']:
-                strategy_found = True
-                strategy = '8: Move to safe place, try to prepare future attack'
-                self.position1 = sorted_eight[0][0][0]
-                self.position2 = sorted_eight[0][0][1]
-            print(sorted_eight)
+            # now it checks if strategy 8 is needed, otherwise only draw happens
+            oth_values_before = sum([values[self.chess_board[i][1]] for i in oth_player_pos])
+            if oth_values_before > 13:
+                eight = {}
+                for self.position1 in randomized_curr_player_pos:
+                    for self.position2 in dist_ordered_pos2s:
+                        if self.check_legal_move() and not self.virtual_move_results_check(x) and \
+                                piece_dgr_values_check(self.chess_board, self.chess_board_virtual, x, '>=')['r'] and \
+                                not self.move_danger_from_en_passant(self.chess_board):
+                            eight[(self.position1, self.position2)] = piece_dgr_values_check(   # value assign to moves
+                                self.chess_board, self.chess_board_virtual, self.other_player, '<')['a']
+                sorted_eight = sorted(eight.items(), key=lambda i: i[1], reverse=True)
+                # if eight still empty, returns []
+                if sorted_eight and sorted_eight[0][1] > piece_dgr_values_check(    # if greatest value after > before
+                        self.chess_board, self.chess_board_virtual, self.other_player, '<')['b']:
+                    strategy_found = True
+                    strategy = '8: Move to safe place, try to prepare future attack'
+                    self.position1 = sorted_eight[0][0][0]
+                    self.position2 = sorted_eight[0][0][1]
+                # print(sorted_eight)
+            else:
+                print('Strategy 8 deactivated due to low threat from opponent')
             # tries once more, but without increasing the the sum of value of the opponent's pieces in danger (9th)
             if not strategy_found:
                 for self.position1 in randomized_curr_player_pos:
