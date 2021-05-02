@@ -14,7 +14,7 @@ class Chess:
     def __init__(self, master):
         self.master = master
         self.master.title('Chess Game')
-        self.screen_size = (1024, 576)  # other (1024, 576)(1366, 768)(1920, 1080)
+        self.screen_size = (1366, 768)  # other (1024, 576)(1366, 768)(1920, 1080)
         # 2 blue edge, 50 bar and menu, 40 tray = 92
         self.master.minsize(self.screen_size[0] - 2, self.screen_size[1] - 92)
         self.master.maxsize(self.screen_size[0] - 2, self.screen_size[1] - 92)
@@ -39,45 +39,50 @@ class Chess:
         self.font_color = 'black'
         self.font_type = 'TKDefaultFont'
         # chess backend variables
+        self.chess_board = {}
+        self.captured_pieces = {}
+        self.current_player = None
+        self.other_player = None
         self.currently_selected = tk.StringVar()
         self.selected_piece = None
         self.position1 = '  '
         self.position2 = '  '
         self.game_still_going = True
-        self.current_player = 'w'
-        self.other_player = 'b'
 
         self.play_game()
 
     def play_game(self):
-        self.generate_board()
-        self.load_initial_setup()
+        self.load_board_setup('initial_setup.txt')
         self.draw_menu()
         self.draw_4_main_canvas()
         self.draw_chess_board()
+        self.draw_captured()
         self.draw_squares()
         self.initialize_pieces()    # draw included
         self.play_dual()
 
-    def generate_board(self):
-        self.chess_keys = []
-        for number in range(8, 0, -1):
-            for letter in char_range('a', 'h'):
-                self.chess_keys.append(letter + str(number))
-        self.chess_values = ['  ' for i in range(64)]
-        zipped = list(zip(self.chess_keys, self.chess_values))
-        self.chess_board = {}
-        self.chess_board.update(zipped)
-        # print(self.chess_board)
-
-    def load_initial_setup(self):
-        file = open('initial_setup.txt', 'r')
+    def load_board_setup(self, filename):
+        file = open(filename, 'r')
         data = file.read().splitlines()
-        for line in data:
+        for line in data[0:64]:
             (key, value) = line.split('=')
-            self.chess_board[key] = value
+            self.chess_board[key] = value   # importing full chess board data (old generate board)
+        for color in ['w', 'b']:
+            self.captured_pieces[color] = []
+        for line in data[65:81]:
+            value = line.split('=')[1]
+            self.captured_pieces['w'].append(value)     # importing captures white pieces data
+        for line in data[81:97]:
+            value = line.split('=')[1]
+            self.captured_pieces['b'].append(value)     # importing captures black pieces data
+        current_player_line = data[97]
+        current_player_value = current_player_line.split('=')[1]
+        self.current_player = current_player_value
+        other_player_line = data[98]
+        other_player_value = other_player_line.split('=')[1]
+        self.other_player = other_player_value
         file.close()
-        # print(self.chess_board)
+        self.chess_keys = list(self.chess_board.keys())
 
     def draw_menu(self):
         self.master.option_add('*tearOff', False)
@@ -88,41 +93,41 @@ class Chess:
         self.file_menu.add_command(label='Board size')
 
     def draw_4_main_canvas(self):
-        self.c_board_size = self.screen_size[1] - 100  # 92 plus 3 + 5
-        self.c_col2_width = self.screen_size[0] - self.c_board_size - 24  # 2blue edge,12separator, 5,5 pad x
-        self.c_curr_plyr_h = self.c_board_size / 4
-        self.c_capt_h = (self.c_board_size - self.c_curr_plyr_h - 24) / 2  # 12 x 2 separator
+        self.c_left_side = self.screen_size[1] - 100  # 92 plus 3 + 5
+        self.c_right_width = self.screen_size[0] - self.c_left_side - 24  # 2blue edge,12separator, 5,5 pad x
+        self.c_right_center_height = self.c_left_side / 4
+        self.c_right_top_height = (self.c_left_side - self.c_right_center_height - 24) / 2  # 12 x 2 separator
 
-        self.c_board = tk.Canvas(self.master, width=self.c_board_size, height=self.c_board_size)
-        self.c_blck_capt = tk.Canvas(self.master, width=self.c_col2_width, height=self.c_capt_h)
-        self.c_whte_capt = tk.Canvas(self.master, width=self.c_col2_width, height=self.c_capt_h)
-        self.c_curr_plyr = tk.Canvas(self.master, width=self.c_col2_width, height=self.c_curr_plyr_h)
-        for canvas_item in [self.c_board, self.c_blck_capt, self.c_whte_capt, self.c_curr_plyr]:
+        self.c_left = tk.Canvas(self.master, width=self.c_left_side, height=self.c_left_side)
+        self.c_right_top = tk.Canvas(self.master, width=self.c_right_width, height=self.c_right_top_height)
+        self.c_right_bottom = tk.Canvas(self.master, width=self.c_right_width, height=self.c_right_top_height)
+        self.c_right_center = tk.Canvas(self.master, width=self.c_right_width, height=self.c_right_center_height)
+        for canvas_item in [self.c_left, self.c_right_top, self.c_right_bottom, self.c_right_center]:
             canvas_item['bg'] = self.canvas_widgets_color
             canvas_item['highlightthickness'] = 0
         self.separator1 = ttk.Separator(self.master, orient='vertical')
         self.separator2 = ttk.Separator(self.master, orient='horizontal')
         self.separator3 = ttk.Separator(self.master, orient='horizontal')
 
-        self.c_board.grid(column=0, row=0, columnspan=1, rowspan=5, padx=5, pady=(3, 0))
+        self.c_left.grid(column=0, row=0, columnspan=1, rowspan=5, padx=5, pady=(3, 0))
         self.separator1.grid(column=1, row=0, columnspan=1, rowspan=5, sticky='n, s')
-        self.c_blck_capt.grid(column=2, row=0, padx=(5, 0), pady=(3, 5))
+        self.c_right_top.grid(column=2, row=0, padx=(5, 0), pady=(3, 5))
         self.separator2.grid(column=2, row=1, sticky='w, e')
-        self.c_curr_plyr.grid(column=2, row=2, padx=(5, 0), pady=5)
+        self.c_right_center.grid(column=2, row=2, padx=(5, 0), pady=5)
         self.separator3.grid(column=2, row=3, sticky='w, e')
-        self.c_whte_capt.grid(column=2, row=4, padx=(5, 0), pady=(5, 0))
+        self.c_right_bottom.grid(column=2, row=4, padx=(5, 0), pady=(5, 0))
 
         self.master.bind('<Button-3>', lambda e: self.reset_selection())
 
     def draw_chess_board(self):
-        self.c_123abc_w = (self.c_board_size - self.square_size * 8) / 2    # strip width of 1-8, a-h
+        self.c_123abc_w = (self.c_left_side - self.square_size * 8) / 2    # strip width of 1-8, a-h
 
-        self.c_chess = tk.Canvas(self.c_board, width=self.square_size * 8, height=self.square_size * 8,
+        self.c_chess = tk.Canvas(self.c_left, width=self.square_size * 8, height=self.square_size * 8,
                                  bg=self.canvas_widgets_color)
 
         self.board_abcx2 = {}   # creating two rows of letters a-h
         for i in ['n', 's']:
-            self.board_abcx2[i] = tk.Canvas(self.c_board, width=self.square_size * 8,
+            self.board_abcx2[i] = tk.Canvas(self.c_left, width=self.square_size * 8,
                                             height=self.c_123abc_w, bg=self.abc123_color)
             for j in char_range('a', 'h'):
                 self.board_abcx2[i].create_text(
@@ -131,11 +136,11 @@ class Chess:
 
         self.board_123x2 = {}   # creating two columns of numbers 1-8
         for i in ['w', 'e']:
-            self.board_123x2[i] = tk.Canvas(self.c_board, width=self.c_123abc_w,
-                                            height=self.c_board_size, bg=self.abc123_color)
+            self.board_123x2[i] = tk.Canvas(self.c_left, width=self.c_123abc_w,
+                                            height=self.c_left_side, bg=self.abc123_color)
             for j in range(0, 8):
                 self.board_123x2[i].create_text(
-                    self.c_123abc_w / 2, self.c_board_size - self.c_123abc_w - self.square_size * (j + 0.5),
+                    self.c_123abc_w / 2, self.c_left_side - self.c_123abc_w - self.square_size * (j + 0.5),
                     text=j+1, fill=self.font_color, font=(self.font_type, self.font_size))
 
         for canvas_item in [self.c_chess, self.board_abcx2['n'], self.board_abcx2['s'],
@@ -147,6 +152,15 @@ class Chess:
         self.c_chess.grid(column=1, row=1)
         self.board_abcx2['s'].grid(column=1, row=2)
         self.board_123x2['e'].grid(column=2, row=0, rowspan=3)
+
+    def draw_captured(self):
+        self.c_captured = {}  # creating two areas for captured pieces
+        for color, parent in [('w', self.c_right_bottom), ('b', self.c_right_top)]:
+            self.c_captured[color] = tk.Canvas(parent, width=self.square_size * 8,
+                                          height=self.square_size * 2, bg='orange', highlightthickness=0)
+        for color, y in [('b', self.square_size), ('w', self.c_right_top_height - self.square_size * 3)]:
+            self.c_captured[color].place(anchor='n', height=self.square_size * 2, width=self.square_size * 8,
+                                         x=self.c_right_width / 2, y=y)
 
     def draw_squares(self):
         for i in self.chess_keys:
