@@ -143,8 +143,16 @@ class Chess:
             self.chess_board_keys = list(self.chess_board.keys())
             # print(self.captured_pieces)
         except FileNotFoundError as error:
-            self.master.after(5000, print(error))
+            print(error)
+            tk.messagebox.showerror(title='Error', message='initial_setup.txt is missing from game directory!')
             self.master.destroy()
+        except IndexError:
+            self.captured_pieces = self.captured_pieces2
+            self.chess_board = self.chess_board2
+            self.current_player = self.current_player2
+            self.other_player = self.other_player2
+            print('Wrong file opened!')
+            tk.messagebox.showerror(title='Error', message='Saved game file is corrupted!')
 
     def draw_menu(self):
         self.master.option_add('*tearOff', False)
@@ -172,6 +180,10 @@ class Chess:
     def load_game(self):
         path = tk.filedialog.askopenfilename(filetypes=[('Text Documents', '*.txt')])
         if path:
+            self.chess_board2 = self.chess_board.copy()  # saving backups
+            self.captured_pieces2 = self.captured_pieces.copy()
+            self.current_player2 = self.current_player
+            self.other_player2 = self.other_player
             self.game_still_going = False
             self.file_to_load = path
             self.currently_selected.set('exit')
