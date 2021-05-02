@@ -1,6 +1,7 @@
 # Chess Game by astro_tech
-![](/graphics/chess_banner.png)
 *A fully functional chess game built with python, which supports playing against computer*
+
+![](/graphics/chess_banner.png)
 ### About the development:
 The application was mainly built for learning purposes. This enabled me to gain experience with graphical user
 interface using python with tkinter. It also helped me to learn about object-oriented programming and handling
