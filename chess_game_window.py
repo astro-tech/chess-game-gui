@@ -19,36 +19,43 @@ class Chess:
         self.master.minsize(self.screen_size[0] - 2, self.screen_size[1] - 92)
         self.master.maxsize(self.screen_size[0] - 2, self.screen_size[1] - 92)
         self.master.geometry(f'{self.screen_size[0] - 2}x{self.screen_size[1] - 92}+0+0')
-
-        self.square_size = int(self.screen_size[1] / 10.97)  # 70 for 1366x768
+        # widgets parameters
         self.canvas_widgets_color = 'grey75'
         self.abc123_color = 'grey50'
-        self.font_type = 'TKDefaultFont'
+        # square parameters
+        self.square_size = int(self.screen_size[1] / 10.97)  # 70 for 1366x768
+        self.light_squares_color = '#fef0d6'
+        self.light_squares_highlight = '#ff836b'
+        self.dark_squares_color = '#7d564a'
+        self.dark_squares_highlight = '#be3625'
+        # piece parameters
+        self.piece_size = int(self.square_size * (5 / 7))   # 50 for 1366x768
+        self.light_piece_color = '#d2ac79'
+        self.light_piece_highlight = '#f4541e'
+        self.dark_piece_color = '#2a1510'
+        self.dark_piece_highlight = '#ca2e04'
+        # font parameters
         self.font_size = int(self.square_size / 3.5)  # 20 for 1366x768
         self.font_color = 'black'
-        self.light_squares_color = '#fef0d6' #'grey95'
-        self.light_squares_highlight = '#ffc8c8'
-        self.dark_squares_color = '#7d564a' #'grey25'
-        self.dark_squares_highlight = '#800000'
-
-        self.light_piece_color = '#d2ac79'
-        self.light_piece_highlight = self.light_squares_highlight
-        self.dark_piece_color = '#2a1510'
-        self.dark_piece_highlight = self.dark_squares_highlight
-        self.piece_size = int(self.font_size*2.5)
-
+        self.font_type = 'TKDefaultFont'
+        # chess backend variables
         self.currently_selected = tk.StringVar()
         self.position1 = '  '
         self.position2 = '  '
         self.game_still_going = True
+        self.current_player = 'w'
+        self.other_player = 'b'
 
+        self.play_game()
+
+    def play_game(self):
         self.generate_board()
         self.load_initial_setup()
         self.draw_menu()
         self.draw_4_main_canvas()
         self.draw_chess_board()
         self.draw_squares()
-        self.draw_pieces()
+        self.initialize_pieces()    # draw included
         self.play_dual()
 
     def generate_board(self):
@@ -178,53 +185,75 @@ class Chess:
         elif txt == 'i':
             return '♟'
 
-    def txt_map_color(self, txt):
-        if txt == 'w':
+    def txt_map_color(self, color):
+        if color == 'w':
             return self.light_piece_color, self.light_piece_highlight
-        elif txt == 'b':
+        elif color == 'b':
             return self.dark_piece_color, self.dark_piece_highlight
 
-    def draw_pieces(self):      # the pieces are already bound to button1 via their tags during draw_squares
+    def initialize_pieces(self):
         for i in self.chess_board:
             if self.chess_board[i] != '  ':
-                self.c_chess.create_text(
-                    self.get_center(i),
-                    text=self.txt_map_piece(self.chess_board[i][1]),
-                    tag=('piece', 'piece_' + i),
-                    fill=self.txt_map_color(self.chess_board[i][0])[0],
-                    activefill=self.txt_map_color(self.chess_board[i][0])[1],
-                    font=(self.font_type, self.piece_size))
+                if self.chess_board[i][0] == 'w':
+                    self.draw_pieces(i, 'w')
+                elif self.chess_board[i][0] == 'b':
+                    self.draw_pieces(i, 'b')
+            # all tags has to be bound, otherwise not able to move piece after initial move
             self.c_chess.tag_bind('piece_' + i, '<Button-1>', lambda e, n=i: self.currently_selected.set(n))
+
+    def draw_pieces(self, pos, color):
+        self.c_chess.create_text(
+            self.get_center(pos),
+            text=self.txt_map_piece(self.chess_board[pos][1]),
+            tag=('piece', 'piece_' + pos, color),
+            fill=self.txt_map_color(color)[0],
+            activefill=self.txt_map_color(color)[1],
+            font=(self.font_type, self.piece_size))
 
     def play_dual(self):
         while self.game_still_going:
-            self.handle_turn()
+            self.handle_turn(self.current_player)
+            self.flip_player()
 
-    def handle_turn(self):
-        # white is next
-        self.c_chess.itemconfigure('piece', state=tk.NORMAL)
+    def handle_turn(self, x):
+        if x == 'w':
+            print('White is next to move.')     # todo make it a canvas text
+        elif x == 'b':
+            print('Black is next to move.')
+        self.c_chess.itemconfigure('piece', state=tk.DISABLED)      # initialize select piece
         self.c_chess.itemconfigure('square', state=tk.DISABLED)
+        self.c_chess.itemconfigure(x, state=tk.NORMAL)
         print('waiting for position1')
         self.c_chess.wait_variable(self.currently_selected)
         self.position1 = self.currently_selected.get()
         print('position1=' + self.position1)
         selected_piece = self.c_chess.find_withtag(f'piece_{self.position1}')   # get id of selected piece
         print('id=' + str(selected_piece))
+        self.c_chess.itemconfigure(selected_piece, fill=self.txt_map_color(x)[1])     # set constant red
 
+        self.c_chess.itemconfigure('piece', state=tk.DISABLED)      # initialize select square
         self.c_chess.itemconfigure('square', state=tk.NORMAL)
-        self.c_chess.itemconfigure('piece', state=tk.DISABLED)
         print('waiting for position2')
         self.c_chess.wait_variable(self.currently_selected)
         self.position2 = self.currently_selected.get()
         print('position2=' + self.position2)
 
         self.c_chess.coords(selected_piece, self.get_center(self.position2))    # movement of piece
+        self.c_chess.itemconfigure(selected_piece, fill=self.txt_map_color(x)[0])  # set original color
         # lekerdezzuk a tagjait amivel leptunk
         print('old tags=' + str(self.c_chess.gettags(selected_piece)))
         # megváltozatjuk a tagjet
-        self.c_chess.itemconfigure(selected_piece, tag=('piece', f'piece_{self.position2}'))
+        self.c_chess.itemconfigure(selected_piece, tag=('piece', f'piece_{self.position2}', x))
         # lekerdezzuk ujra
         print('new tags=' + str(self.c_chess.gettags(selected_piece)))
+
+    def flip_player(self):
+        if self.current_player == 'w':
+            self.current_player = 'b'
+            self.other_player = 'w'
+        elif self.current_player == 'b':
+            self.current_player = 'w'
+            self.other_player = 'b'
 
 
 if __name__ == '__main__':
