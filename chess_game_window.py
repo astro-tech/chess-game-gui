@@ -40,6 +40,7 @@ class Chess:
         self.font_type = 'TKDefaultFont'
         # chess backend variables
         self.currently_selected = tk.StringVar()
+        self.selected_piece = None
         self.position1 = '  '
         self.position2 = '  '
         self.game_still_going = True
@@ -110,6 +111,8 @@ class Chess:
         self.c_curr_plyr.grid(column=2, row=2, padx=(5, 0), pady=5)
         self.separator3.grid(column=2, row=3, sticky='w, e')
         self.c_whte_capt.grid(column=2, row=4, padx=(5, 0), pady=(5, 0))
+
+        self.master.bind('<Button-3>', lambda e: self.reset_selection())
 
     def draw_chess_board(self):
         self.c_123abc_w = (self.c_board_size - self.square_size * 8) / 2    # strip width of 1-8, a-h
@@ -217,9 +220,10 @@ class Chess:
 
     def handle_turn(self, x):
         if x == 'w':
-            print('White is next to move.')     # todo make it a canvas text
+            print('White is next to move')     # todo make it a canvas text
         elif x == 'b':
-            print('Black is next to move.')
+            print('Black is next to move')
+
         self.c_chess.itemconfigure('piece', state=tk.DISABLED)      # initialize select piece
         self.c_chess.itemconfigure('square', state=tk.DISABLED)
         self.c_chess.itemconfigure(x, state=tk.NORMAL)
@@ -227,33 +231,43 @@ class Chess:
         self.c_chess.wait_variable(self.currently_selected)
         self.position1 = self.currently_selected.get()
         print('position1=' + self.position1)
-        selected_piece = self.c_chess.find_withtag(f'piece_{self.position1}')   # get id of selected piece
-        print('id=' + str(selected_piece))
-        self.c_chess.itemconfigure(selected_piece, fill=self.txt_map_color(x)[1])     # set constant red
+        self.selected_piece = self.c_chess.find_withtag(f'piece_{self.position1}')   # get id of selected piece
+        print('id=' + str(self.selected_piece))
+        self.c_chess.itemconfigure(self.selected_piece, fill=self.txt_map_color(x)[1])     # set constant red
 
         self.c_chess.itemconfigure('piece', state=tk.DISABLED)      # initialize select square
         self.c_chess.itemconfigure('square', state=tk.NORMAL)
         print('waiting for position2')
+        # in this timeframe there's possibility to reset selection
         self.c_chess.wait_variable(self.currently_selected)
-        self.position2 = self.currently_selected.get()
-        print('position2=' + self.position2)
+        if self.selected_piece is not None:
+            self.position2 = self.currently_selected.get()
+            print('position2=' + self.position2)
+            self.c_chess.coords(self.selected_piece, self.get_center(self.position2))    # movement of piece
+            self.c_chess.itemconfigure(self.selected_piece, fill=self.txt_map_color(x)[0])  # set original color
+            print('old tags=' + str(self.c_chess.gettags(self.selected_piece)))
+            self.c_chess.itemconfigure(self.selected_piece,
+                                       tag=('piece', f'piece_{self.position2}', x))     # update tag of piece
+            print('new tags=' + str(self.c_chess.gettags(self.selected_piece)))
+            self.selected_piece = None
 
-        self.c_chess.coords(selected_piece, self.get_center(self.position2))    # movement of piece
-        self.c_chess.itemconfigure(selected_piece, fill=self.txt_map_color(x)[0])  # set original color
-        # lekerdezzuk a tagjait amivel leptunk
-        print('old tags=' + str(self.c_chess.gettags(selected_piece)))
-        # megváltozatjuk a tagjet
-        self.c_chess.itemconfigure(selected_piece, tag=('piece', f'piece_{self.position2}', x))
-        # lekerdezzuk ujra
-        print('new tags=' + str(self.c_chess.gettags(selected_piece)))
+    def reset_selection(self):
+        print('reset callback working')
+        if self.selected_piece is not None:
+            self.c_chess.itemconfigure(self.selected_piece, fill=self.txt_map_color(self.current_player)[0])
+            self.selected_piece = None
+            self.currently_selected.set('reset')    # substitute anticipated position2 with a reset flag
 
     def flip_player(self):
-        if self.current_player == 'w':
-            self.current_player = 'b'
-            self.other_player = 'w'
-        elif self.current_player == 'b':
-            self.current_player = 'w'
-            self.other_player = 'b'
+        if self.currently_selected.get() != 'reset':
+            if self.current_player == 'w':
+                self.current_player = 'b'
+                self.other_player = 'w'
+            elif self.current_player == 'b':
+                self.current_player = 'w'
+                self.other_player = 'b'
+        else:
+            print('reset occurred, not flipping player')
 
 
 if __name__ == '__main__':
