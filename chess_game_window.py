@@ -86,7 +86,10 @@ class Chess:
                 self.handle_turn(self.current_player)
                 if self.promotion_coordinate(self.current_player):
                     self.promotion_dialog(self.current_player)
-            elif self.number_of_player.get() == 1 and self.current_player2 == 'computer':
+            else:
+                if self.number_of_player.get() == 0:   # to leave time to finish rendering
+                    self.master.after(self.game_speed * 3, lambda: self.currently_selected.set('demo'))
+                    self.c_chess.wait_variable(self.currently_selected)
                 self.computer_turn(self.current_player)
                 if self.promotion_coordinate(self.current_player):
                     self.computer_promotion(self.current_player)
@@ -204,16 +207,18 @@ class Chess:
         settings_frame = ttk.Frame(settings_window, padding=10)
         settings_frame.grid(column=0, row=0, sticky='n, w, e, s')
 
-        message1 = ttk.Label(settings_frame, text='Single player mode with computer:', padding=5)
-        message2 = ttk.Label(settings_frame, text='Highlight legal movement squares with green:', padding=5)
-        message1.grid(column=0, row=0, columnspan=3, sticky='n, w')
-        message2.grid(column=0, row=1, columnspan=3, sticky='n, w')
-        player_number_button = \
-            ttk.Checkbutton(settings_frame, variable=number_of_player2, onvalue=1, offvalue=2, padding=5)
-        legal_moves_button = \
+        self.c['msg0'] = ttk.Label(settings_frame, text='Dual player mode:', padding=5)
+        self.c['msg1'] = ttk.Label(settings_frame, text='Single player mode with computer:', padding=5)
+        self.c['msg2'] = ttk.Label(settings_frame, text='No player (computer plays only for demonstration):', padding=5)
+        self.c['msg3'] = ttk.Label(settings_frame, text='Highlight legal movement squares with green:', padding=5)
+        self.c['button0'] = ttk.Radiobutton(settings_frame, variable=number_of_player2, value=2, padding=5)
+        self.c['button1'] = ttk.Radiobutton(settings_frame, variable=number_of_player2, value=1, padding=5)
+        self.c['button2'] = ttk.Radiobutton(settings_frame, variable=number_of_player2, value=0, padding=5)
+        self.c['button3'] = \
             ttk.Checkbutton(settings_frame, variable=show_legal_moves2, onvalue=True, offvalue=False, padding=5)
-        player_number_button.grid(column=3, row=0, sticky='n, e')
-        legal_moves_button.grid(column=3, row=1, sticky='n, e')
+        for i in [0, 1, 2, 3]:
+            self.c['msg' + str(i)].grid(column=0, row=i, columnspan=3, sticky='n, w')
+            self.c['button' + str(i)].grid(column=3, row=i, sticky='n, e')
 
         def apply_button_logic():
             self.show_legal_moves.set(show_legal_moves2.get())
@@ -222,8 +227,8 @@ class Chess:
 
         apply_button = ttk.Button(settings_frame, text='Apply', command=apply_button_logic)
         cancel_button = ttk.Button(settings_frame, text='Cancel', command=lambda: settings_selected.set(True))
-        apply_button.grid(column=2, row=2, sticky='n, e, s')
-        cancel_button.grid(column=3, row=2, sticky='n, s')
+        apply_button.grid(column=2, row=4, sticky='n, e, s')
+        cancel_button.grid(column=3, row=4, sticky='n, s')
 
         root.wait_variable(settings_selected)
         settings_window.destroy()
@@ -947,11 +952,12 @@ class Chess:
             elif self.current_player == 'b':
                 self.current_player = 'w'
                 self.other_player = 'b'
-            if self.number_of_player.get() == 1 and self.current_player2 == 'man':
+            if (self.number_of_player.get() == 1 and self.current_player2 == 'man') or \
+                    self.number_of_player.get() == 0:
                 self.current_player2 = 'computer'
             elif (self.number_of_player.get() == 1 and self.current_player2 == 'computer') or \
-                    self.number_of_player.get() == 2:  # comment out these lines to make computer play only
-                self.current_player2 = 'man'  # comment out these lines to make computer play only
+                    self.number_of_player.get() == 2:
+                self.current_player2 = 'man'
         else:
             print('reset or check condition, not flipping player')
 
