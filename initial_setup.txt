@@ -97,3 +97,4 @@ b14=
 b15=  
 current_player=w
 other_player=b
+these_rook_king_moved=
