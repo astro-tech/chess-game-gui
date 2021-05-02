@@ -2,9 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
 
-# from https://stackoverflow.com/questions/7001144/range-over-character-in-python
-# range function for letters
-def char_range(c1, c2):
+def char_range(c1, c2):     # stackoverflow.com/questions/7001144/range-over-character-in-python
     """Generates the characters from `c1` to `c2`, inclusive."""
     for c in range(ord(c1), ord(c2) + 1):
         yield chr(c)
@@ -71,7 +69,7 @@ class Chess:
             if self.promotion_coordinate(self.current_player):
                 self.promotion_dialog(self.current_player)
             self.flip_player()
-            self.check_if_game_still_going()
+            self.check_if_game_still_going(self.current_player)
 
     def clear_previous_session(self):
         self.game_still_going = True
@@ -642,7 +640,7 @@ class Chess:
         valid_position2 = []
         for k in self.chess_board_keys:
             self.position2 = k
-            if self.check_game_rules() and \
+            if self.check_legal_move() and \
                     self.chess_board[self.position2] not in [x + 'T', x + 'f', x + 'A', x + '+', x + '*', x + 'i']:
                 valid_position2.append(k)
         return valid_position2
@@ -690,59 +688,35 @@ class Chess:
         self.c_chess.itemconfigure(self.selected_piece, text=self.txt_map_piece(button_value.get()))  # set frontend
         self.display_board()
 
-    def check_game_rules(self):
-        if self.chess_board[self.position1] in ['wT', 'bT']:
-            return self.legal_move_rook()
-        if self.chess_board[self.position1] in ['wA', 'bA']:
-            return self.legal_move_bishop()
-        if self.chess_board[self.position1] in ['w*', 'b*']:
-            return self.legal_move_queen()
-        if self.chess_board[self.position1] in ['w+', 'b+']:
-            return self.legal_move_king()
-        if self.chess_board[self.position1] in ['wf', 'bf']:
-            return self.legal_move_knight()
-        if self.chess_board[self.position1] in ['wi']:
-            return self.legal_move_w_pawn()
-        if self.chess_board[self.position1] in ['bi']:
-            return self.legal_move_b_pawn()
-
-    def legal_move_rook(self):
-        if self.check_movement_cols_rows() and self.check_obstacle_cols_rows():
-            return True
+    def check_legal_move(self):
+        if self.chess_board[self.position1][1] == 'T':    # Rook
+            if self.check_movement_cols_rows() and self.check_obstacle_cols_rows():
+                return True
+        if self.chess_board[self.position1][1] == 'A':    # Bishop
+            if self.check_movement_diagonals() and self.check_obstacle_diagonals():
+                return True
+        if self.chess_board[self.position1][1] == '*':    # Queen
+            if (self.check_movement_cols_rows() or self.check_movement_diagonals()) \
+                    and (self.check_obstacle_cols_rows() or self.check_obstacle_diagonals()):
+                return True
+        if self.chess_board[self.position1][1] == '+':    # King
+            if abs(ord(self.position2[0]) - ord(self.position1[0])) < 2 and \
+                    abs(int(self.position2[1]) - int(self.position1[1])) < 2:
+                return True
+        if self.chess_board[self.position1][1] == 'f':    # Knight
+            if (abs(ord(self.position2[0]) - ord(self.position1[0])) == 1 and
+                abs(int(self.position2[1]) - int(self.position1[1])) == 2) or \
+                    (abs(ord(self.position2[0]) - ord(self.position1[0])) == 2 and
+                     abs(int(self.position2[1]) - int(self.position1[1])) == 1):
+                return True
+        if self.chess_board[self.position1] == 'wi':      # Pawn white
+            if self.move_one_capture_side_one(-1) or self.first_move_two(2, 3, -2):
+                return True
+        if self.chess_board[self.position1] == 'bi':      # Pawn black
+            if self.move_one_capture_side_one(1) or self.first_move_two(7, 6, 2):
+                return True
         return False
 
-    def legal_move_bishop(self):
-        if self.check_movement_diagonals() and self.check_obstacle_diagonals():
-            return True
-        return False
-
-    def legal_move_queen(self):
-        if (self.check_movement_cols_rows() or self.check_movement_diagonals()) \
-                and (self.check_obstacle_cols_rows() or self.check_obstacle_diagonals()):
-            return True
-        return False
-
-    def legal_move_king(self):
-        if self.max1move_all_direction():
-            return True
-        return False
-
-    def legal_move_knight(self):
-        if self.movement_in_l_shape():
-            return True
-        return False
-
-    def legal_move_w_pawn(self):
-        if self.move_up_capture_side_up() or self.first_move_2up():
-            return True
-        return False
-
-    def legal_move_b_pawn(self):
-        if self.move_down_capture_side_down() or self.first_move_2down():
-            return True
-        return False
-
-    # movement analysis from here
     def check_movement_cols_rows(self):
         if self.position1[0] == self.position2[0] or self.position1[1] == self.position2[1]:
             return True
@@ -782,57 +756,24 @@ class Chess:
                     return False
             return True
 
-    def max1move_all_direction(self):
-        if abs(ord(self.position2[0]) - ord(self.position1[0])) < 2 and abs(
-                int(self.position2[1]) - int(self.position1[1])) < 2:
-            return True
-        return False
-
-    def movement_in_l_shape(self):
-        if (abs(ord(self.position2[0]) - ord(self.position1[0])) == 1 and abs(
-                int(self.position2[1]) - int(self.position1[1])) == 2) or \
-                (abs(ord(self.position2[0]) - ord(self.position1[0])) == 2 and abs(
-                    int(self.position2[1]) - int(self.position1[1])) == 1):
-            return True
-        return False
-
-    def move_up_capture_side_up(self):
+    def move_one_capture_side_one(self, dct1):      # direction up if -1, down if 1
         if self.chess_board[self.position2] == '  ':
-            if self.position1[0] == self.position2[0] and int(self.position1[1]) - int(self.position2[1]) == -1:
+            if self.position1[0] == self.position2[0] and int(self.position1[1]) - int(self.position2[1]) == dct1:
                 return True
             return False
         elif self.chess_board[self.position2] != '  ':
             if abs(ord(self.position2[0]) - ord(self.position1[0])) == 1 and \
-                    int(self.position1[1]) - int(self.position2[1]) == -1:
+                    int(self.position1[1]) - int(self.position2[1]) == dct1:
                 return True
             return False
 
-    def move_down_capture_side_down(self):
-        if self.chess_board[self.position2] == '  ':
-            if self.position1[0] == self.position2[0] and int(self.position1[1]) - int(self.position2[1]) == 1:
-                return True
-            return False
-        elif self.chess_board[self.position2] != '  ':
-            if abs(ord(self.position2[0]) - ord(self.position1[0])) == 1 and \
-                    int(self.position1[1]) - int(self.position2[1]) == 1:
-                return True
-            return False
+    def first_move_two(self, init_row, m_row, dct2):     # for white: init_row=2, next_row=3, direction=-2
+        if int(self.position1[1]) == init_row and self.chess_board[self.position2] == '  ' and \
+                self.chess_board[self.position2[0] + str(m_row)] == '  ' and \
+                self.position1[0] == self.position2[0] and int(self.position1[1]) - int(self.position2[1]) == dct2:
+            return True
+        return False
 
-    def first_move_2up(self):
-        if int(self.position1[1]) == 2 and self.chess_board[self.position2] == '  ' and \
-                self.chess_board[self.position2[0] + str(3)] == '  ':
-            if self.position1[0] == self.position2[0] and int(self.position1[1]) - int(self.position2[1]) == -2:
-                return True
-            return False
-
-    def first_move_2down(self):
-        if int(self.position1[1]) == 7 and self.chess_board[self.position2] == '  ' and \
-                self.chess_board[self.position2[0] + str(6)] == '  ':
-            if self.position1[0] == self.position2[0] and int(self.position1[1]) - int(self.position2[1]) == 2:
-                return True
-            return False
-
-    # check analysis from here
     def virtual_move_results_check(self, x):
         chess_board_virtual = self.chess_board.copy()  # shallow copy
         chess_board_virtual[self.position2] = chess_board_virtual[self.position1]
@@ -841,211 +782,98 @@ class Chess:
 
     # checks if xn coordinate of x player on board is under attack from enemy and returns enemy's coordinates
     def coord_danger_from(self, xn, board, x):
-        if self.coord_danger_from_rook_queen(xn, board, x):
-            return self.coord_danger_from_rook_queen(xn, board, x)
-        elif self.coord_danger_from_bishop_queen(xn, board, x):
-            return self.coord_danger_from_bishop_queen(xn, board, x)
-        elif self.coord_danger_from_knight(xn, board, x):
-            return self.coord_danger_from_knight(xn, board, x)
-        elif self.coord_danger_from_pawn(xn, board, x):
-            return self.coord_danger_from_pawn(xn, board, x)
-        elif self.coord_danger_from_king(xn, board, x):
-            return self.coord_danger_from_king(xn, board, x)
+        queen_rook = self.coord_danger_from_queen_rook_bishop(
+            xn, board, x, [('z', 1, 0, -1), ('z', 8, 0, 1), ('h', 9, 1, 0), ('a', 9, -1, 0)], ('T', '*'))
+        # check_param order: from xn checking down, up, right, left
+        queen_bishop = self.coord_danger_from_queen_rook_bishop(
+            xn, board, x, [('h', 1, 1, -1), ('h', 8, 1, 1), ('a', 8, -1, 1), ('a', 1, -1, -1)], ('A', '*'))
+        # check_param order: from xn checking right down, right up, left up, left down
+        king = self.coord_danger_from_king_knight(xn, board, x, [(-1, -1), (0, -1), (1, -1), (-1, 0),
+                                                                 (1, 0), (-1, 1), (0, 1), (1, 1)], '+')
+        knight = self.coord_danger_from_king_knight(xn, board, x, [(1, -2), (2, -1), (2, 1), (1, 2),
+                                                                   (-1, 2), (-2, 1), (-2, -1), (-1, -2)], 'f')
+        white_pawn = self.coord_danger_from_pawn(xn, board, [(-1, -1), (1, -1)], 'w')
+        black_pawn = self.coord_danger_from_pawn(xn, board, [(-1, 1), (1, 1)], 'b')
+        if queen_rook:
+            return queen_rook
+        elif queen_bishop:
+            return queen_bishop
+        elif king:
+            return king
+        elif knight:
+            return knight
+        elif white_pawn and x == 'b':
+            return white_pawn
+        elif black_pawn and x == 'w':
+            return black_pawn
 
-    def coord_danger_from_knight(self, xn, board, x):
-        possible_coordinates = [chr(ord(xn[0]) + 1) + str(int(xn[1]) - 2), chr(ord(xn[0]) + 2) + str(int(xn[1]) - 1),
-                                chr(ord(xn[0]) + 2) + str(int(xn[1]) + 1), chr(ord(xn[0]) + 1) + str(int(xn[1]) + 2),
-                                chr(ord(xn[0]) - 1) + str(int(xn[1]) + 2), chr(ord(xn[0]) - 2) + str(int(xn[1]) + 1),
-                                chr(ord(xn[0]) - 2) + str(int(xn[1]) - 1), chr(ord(xn[0]) - 1) + str(int(xn[1]) - 2)]
-        threat_coordinates = list(set(possible_coordinates).intersection(set(self.chess_board_keys)))
+    def coord_danger_from_queen_rook_bishop(self, xn, board, x, check_param, pieces):
 
-        if x == 'w':
-            for i in threat_coordinates:
-                if board[i] == 'bf':
-                    return i
-        elif x == 'b':
-            for i in threat_coordinates:
-                if board[i] == 'wf':
-                    return i
+        def hor_vrt_dia_check(limit_col, limit_row, dct_c, dct_r):  # universal horizontal, vertical, diagonal
+            if xn[0] != limit_col and int(xn[1]) != limit_row:
+                checked_coordinate = chr(ord(xn[0]) + dct_c) + str(int(xn[1]) + dct_r)
+                reached_edge = False
+                while board[checked_coordinate] == '  ' and not reached_edge:
+                    if checked_coordinate[0] != limit_col and int(checked_coordinate[1]) != limit_row:
+                        checked_coordinate = chr(ord(checked_coordinate[0]) + dct_c) + \
+                                             str(int(checked_coordinate[1]) + dct_r)
+                    else:
+                        reached_edge = True
+                if board[checked_coordinate] != '  ':
+                    threat_coordinates.append(checked_coordinate)
 
-    def coord_danger_from_rook_queen(self, xn, board, x):
         threat_coordinates = []
-
-        if int(xn[1]) != 1:  # from xn checking downwards if possible
-            checked_coordinate = xn[0] + str(int(xn[1]) - 1)
-            end_of_col = False
-            while board[checked_coordinate] == '  ' and not end_of_col:
-                if int(checked_coordinate[1]) != 1:
-                    checked_coordinate = checked_coordinate[0] + str(int(checked_coordinate[1]) - 1)
-                else:
-                    end_of_col = True
-            if board[checked_coordinate] != '  ':
-                threat_coordinates.append(checked_coordinate)
-
-        if int(xn[1]) != 8:  # from xn checking upwards if possible
-            checked_coordinate = xn[0] + str(int(xn[1]) + 1)
-            end_of_col = False
-            while board[checked_coordinate] == '  ' and not end_of_col:
-                if int(checked_coordinate[1]) != 8:
-                    checked_coordinate = checked_coordinate[0] + str(int(checked_coordinate[1]) + 1)
-                else:
-                    end_of_col = True
-            if board[checked_coordinate] != '  ':
-                threat_coordinates.append(checked_coordinate)
-
-        if xn[0] != 'h':  # from xn checking rightwards if possible
-            checked_coordinate = chr(ord(xn[0]) + 1) + xn[1]
-            end_of_row = False
-            while board[checked_coordinate] == '  ' and not end_of_row:
-                if checked_coordinate[0] != 'h':
-                    checked_coordinate = chr(ord(checked_coordinate[0]) + 1) + checked_coordinate[1]
-                else:
-                    end_of_row = True
-            if board[checked_coordinate] != '  ':
-                threat_coordinates.append(checked_coordinate)
-
-        if xn[0] != 'a':  # from xn checking leftwards if possible
-            checked_coordinate = chr(ord(xn[0]) - 1) + xn[1]
-            end_of_row = False
-            while board[checked_coordinate] == '  ' and not end_of_row:
-                if checked_coordinate[0] != 'a':
-                    checked_coordinate = chr(ord(checked_coordinate[0]) - 1) + checked_coordinate[1]
-                else:
-                    end_of_row = True
-            if board[checked_coordinate] != '  ':
-                threat_coordinates.append(checked_coordinate)
-
+        for k in range(len(check_param)):
+            hor_vrt_dia_check(*check_param[k])
         if x == 'w':
             for i in threat_coordinates:
-                if board[i] == 'bT' or board[i] == 'b*':
+                if board[i] == 'b' + pieces[0] or board[i] == 'b' + pieces[1]:
                     return i
         elif x == 'b':
             for i in threat_coordinates:
-                if board[i] == 'wT' or board[i] == 'w*':
+                if board[i] == 'w' + pieces[0] or board[i] == 'w' + pieces[1]:
                     return i
 
-    def coord_danger_from_bishop_queen(self, xn, board, x):
-        threat_coordinates = []
-
-        if xn[0] != 'h' and int(xn[1]) != 1:  # from xn checking downwards right if possible
-            checked_coordinate = chr(ord(xn[0]) + 1) + str(int(xn[1]) - 1)
-            end_of_diagonal = False
-            while board[checked_coordinate] == '  ' and not end_of_diagonal:
-                if checked_coordinate[0] != 'h' and int(checked_coordinate[1]) != 1:
-                    checked_coordinate = chr(ord(checked_coordinate[0]) + 1) + str(int(checked_coordinate[1]) - 1)
-                else:
-                    end_of_diagonal = True
-            if board[checked_coordinate] != '  ':
-                threat_coordinates.append(checked_coordinate)
-
-        if xn[0] != 'h' and int(xn[1]) != 8:  # from xn checking upwards right if possible
-            checked_coordinate = chr(ord(xn[0]) + 1) + str(int(xn[1]) + 1)
-            end_of_diagonal = False
-            while board[checked_coordinate] == '  ' and not end_of_diagonal:
-                if checked_coordinate[0] != 'h' and int(checked_coordinate[1]) != 8:
-                    checked_coordinate = chr(ord(checked_coordinate[0]) + 1) + str(int(checked_coordinate[1]) + 1)
-                else:
-                    end_of_diagonal = True
-            if board[checked_coordinate] != '  ':
-                threat_coordinates.append(checked_coordinate)
-
-        if xn[0] != 'a' and int(xn[1]) != 8:  # from xn checking upwards left if possible
-            checked_coordinate = chr(ord(xn[0]) - 1) + str(int(xn[1]) + 1)
-            end_of_diagonal = False
-            while board[checked_coordinate] == '  ' and not end_of_diagonal:
-                if checked_coordinate[0] != 'a' and int(checked_coordinate[1]) != 8:
-                    checked_coordinate = chr(ord(checked_coordinate[0]) - 1) + str(int(checked_coordinate[1]) + 1)
-                else:
-                    end_of_diagonal = True
-            if board[checked_coordinate] != '  ':
-                threat_coordinates.append(checked_coordinate)
-
-        if xn[0] != 'a' and int(xn[1]) != 1:  # from xn checking downwards left if possible
-            checked_coordinate = chr(ord(xn[0]) - 1) + str(int(xn[1]) - 1)
-            end_of_diagonal = False
-            while board[checked_coordinate] == '  ' and not end_of_diagonal:
-                if checked_coordinate[0] != 'a' and int(checked_coordinate[1]) != 1:
-                    checked_coordinate = chr(ord(checked_coordinate[0]) - 1) + str(int(checked_coordinate[1]) - 1)
-                else:
-                    end_of_diagonal = True
-            if board[checked_coordinate] != '  ':
-                threat_coordinates.append(checked_coordinate)
-
-        if x == 'w':
-            for i in threat_coordinates:
-                if board[i] == 'bA' or board[i] == 'b*':
-                    return i
-        elif x == 'b':
-            for i in threat_coordinates:
-                if board[i] == 'wA' or board[i] == 'w*':
-                    return i
-
-    def coord_danger_from_king(self, xn, board, x):
-        possible_coordinates = [chr(ord(xn[0]) - 1) + str(int(xn[1]) - 1), xn[0] + str(int(xn[1]) - 1),
-                                chr(ord(xn[0]) + 1) + str(int(xn[1]) - 1), chr(ord(xn[0]) - 1) + xn[1],
-                                chr(ord(xn[0]) + 1) + xn[1], chr(ord(xn[0]) - 1) + str(int(xn[1]) + 1),
-                                xn[0] + str(int(xn[1]) + 1), chr(ord(xn[0]) + 1) + str(int(xn[1]) + 1)]
-        threat_coordinates = list(set(possible_coordinates).intersection(set(self.chess_board_keys)))
-
-        if x == 'w':
-            for i in threat_coordinates:
-                if board[i] == 'b+':
-                    return i
-        elif x == 'b':
-            for i in threat_coordinates:
-                if board[i] == 'w+':
-                    return i
-
-    def coord_danger_from_pawn(self, xn, board, x):
+    def coord_danger_from_king_knight(self, xn, board, x, xy, piece):
         possible_coordinates = []
-        if x == 'w':
-            possible_coordinates.append(chr(ord(xn[0]) - 1) + str(int(xn[1]) + 1))
-            possible_coordinates.append(chr(ord(xn[0]) + 1) + str(int(xn[1]) + 1))
-        elif x == 'b':
-            possible_coordinates.append(chr(ord(xn[0]) - 1) + str(int(xn[1]) - 1))
-            possible_coordinates.append(chr(ord(xn[0]) + 1) + str(int(xn[1]) - 1))
+        for a, b in xy:
+            possible_coordinates.append(chr(ord(xn[0]) + a) + str(int(xn[1]) + b))
         threat_coordinates = list(set(possible_coordinates).intersection(set(self.chess_board_keys)))
-
         if x == 'w':
             for i in threat_coordinates:
-                if board[i] == 'bi':
+                if board[i] == 'b' + piece:
                     return i
         elif x == 'b':
             for i in threat_coordinates:
-                if board[i] == 'wi':
+                if board[i] == 'w' + piece:
                     return i
 
-    def check_if_game_still_going(self):
+    def coord_danger_from_pawn(self, xn, board, xy, color):
+        possible_coordinates = []
+        for a, b in xy:
+            possible_coordinates.append(chr(ord(xn[0]) + a) + str(int(xn[1]) + b))
+        threat_coordinates = list(set(possible_coordinates).intersection(set(self.chess_board_keys)))
+        for i in threat_coordinates:
+            if board[i] == color + 'i':
+                return i
+
+    def check_if_game_still_going(self, x):
         if self.currently_selected.get() != 'exit':
-            if self.check_for_checkmate(self.current_player):
+            legal_move = self.legal_move_possible(x)    # to prevent running the method twice
+            if not legal_move and self.king_in_check(x, self.chess_board):  # checkmate
                 self.game_still_going = False
                 self.c_chess.itemconfigure('square', state=tk.DISABLED)
                 self.winner = self.other_player
-            elif self.check_for_stalemate(self.current_player):
+            elif not legal_move:                                            # stalemate
                 self.game_still_going = False
                 self.c_chess.itemconfigure('square', state=tk.DISABLED)
 
-    def check_for_checkmate(self, x):
-        if not self.legal_move_possible(x) and self.king_in_check(x, self.chess_board):
-            return True
-        return False
-
-    def check_for_stalemate(self, x):
-        if not self.legal_move_possible(x):
-            return True
-        return False
-
     def legal_move_possible(self, x):
-        current_player_positions = []
-        for i in self.chess_board_keys:
-            if self.chess_board[i][0] == x:
-                current_player_positions.append(i)
-        for i in current_player_positions:
-            self.position1 = i
-            for j in self.chess_board_keys:
-                self.position2 = j
+        current_player_positions = [i for i in self.chess_board_keys if self.chess_board[i][0] == x]
+        for self.position1 in current_player_positions:
+            for self.position2 in self.chess_board_keys:
                 if self.chess_board[self.position2] not in [x + 'T', x + 'f', x + 'A', x + '+', x + '*', x + 'i'] and \
-                        self.check_game_rules() and not self.virtual_move_results_check(x):
+                        self.check_legal_move() and not self.virtual_move_results_check(x):
                     return True
         return False
 
