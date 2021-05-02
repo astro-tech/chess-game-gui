@@ -78,6 +78,8 @@ class Chess:
                     self.promotion_dialog(self.current_player)
             elif self.number_of_player.get() == 1 and self.current_player2 == 'computer':
                 self.computer_turn(self.current_player)
+                if self.promotion_coordinate(self.current_player):
+                    self.computer_promotion(self.current_player)
             self.game_is_saved = False
             self.flip_player()
             self.check_if_game_still_going(self.current_player)
@@ -104,7 +106,6 @@ class Chess:
         file_menu.add_command(label='Save Game', command=self.save_game)
         file_menu.add_separator()
         file_menu.add_command(label='Exit', command=self.exit_game)
-        options_menu.add_command(label='Board size')
         options_menu.add_command(label='Settings', command=self.settings_dialog)
 
         self.c['castling_menu'] = tk.Menu(self.master)  # context menu
@@ -626,7 +627,7 @@ class Chess:
         return curr_speed
 
     def handle_turn(self, x):
-        print(self.position1)
+        # print(self.position1)
         self.selected_piece = None
         curr_speed = self.display_next_player(x)    # also returns current game speed
         self.c_chess.itemconfigure('piece', state=tk.DISABLED)  # initialize select piece
@@ -923,6 +924,14 @@ class Chess:
 
         self.chess_board[self.promotion_coordinate(x)] = x + button_value.get()  # set backend
         self.c_chess.itemconfigure(self.selected_piece, text=self.txt_map_piece(button_value.get()))  # set frontend
+        self.display_board()
+
+    def computer_promotion(self, x):
+        promotion_piece = self.c_chess.find_withtag(f'piece_{self.promotion_coordinate(x)}')
+        self.master.after(self.game_speed * 2,
+                          lambda: self.c_chess.itemconfigure(promotion_piece, text=self.txt_map_piece('*')))
+        self.chess_board[self.promotion_coordinate(x)] = x + '*'
+        print('Promotion occurred. ' + x + 'i became ' + x + '*.')
         self.display_board()
 
     def check_legal_move(self):
