@@ -48,6 +48,7 @@ class Chess:
         self.position1 = '  '
         self.position2 = '  '
         self.game_still_going = True
+        self.winner = None
 
         self.play_game()
 
@@ -96,7 +97,15 @@ class Chess:
         self.draw_captured_pieces()
         self.draw_squares()
         self.initialize_pieces()  # draw included
+        self.display_board()
         self.play_dual()
+        self.ask_for_new_game()
+
+    def play_dual(self):
+        while self.game_still_going:
+            self.handle_turn(self.current_player)
+            self.flip_player()
+            self.check_if_game_still_going()
 
     def load_board_setup(self, filename):
         file = open(filename, 'r')
@@ -127,8 +136,23 @@ class Chess:
         self.chess_menu = tk.Menu(self.master)
         self.master['menu'] = self.chess_menu
         self.file_menu = tk.Menu(self.chess_menu)
+        self.options_menu = tk.Menu(self.chess_menu)
         self.chess_menu.add_cascade(label='File', menu=self.file_menu, underline=0)
-        self.file_menu.add_command(label='Board size')
+        self.chess_menu.add_cascade(label='Options', menu=self.options_menu, underline=0)
+        self.file_menu.add_command(label='New Game')
+        self.file_menu.add_command(label='Load Game')
+        self.file_menu.add_command(label='Save Game')
+        self.file_menu.add_separator()
+        self.file_menu.add_command(label='Exit', command=self.exit_game)
+        self.options_menu.add_command(label='Board size')
+
+    def exit_game(self):
+        exit_response = tk.messagebox.askyesno(title='Quit game', message='Do you want to exit game?')
+        if exit_response:
+            self.game_still_going = False
+            self.currently_selected.set('exit')
+            print('Exiting chess')
+            self.master.destroy()
 
     def draw_4_main_canvas(self):
         self.c_left_side = self.screen_size[1] - 100  # 92 plus 3 + 5
@@ -302,16 +326,10 @@ class Chess:
             activefill=self.txt_map_color(color)[1],
             font=(self.font_type, self.piece_size))
 
-    def play_dual(self):
-        while self.game_still_going:
-            self.handle_turn(self.current_player)
-            self.flip_player()
-
     def handle_turn(self, x):
         # for i in range(1, 97):
         #     print(i, end=' ')
         #     print(self.c_chess.gettags(i))
-        self.display_board()
         if x == 'w':
             print('White is next to move')
             self.c_right_center.itemconfigure(self.current_player_label, text='White is next to move')
@@ -324,61 +342,65 @@ class Chess:
         self.c_chess.itemconfigure(x, state=tk.NORMAL)
         print('waiting for position1')
         self.c_chess.wait_variable(self.currently_selected)
-        self.position1 = self.currently_selected.get()
-        print('position1=' + self.position1)
-        self.selected_piece = self.c_chess.find_withtag(f'piece_{self.position1}')  # get id of selected piece
-        print('id=' + str(self.selected_piece))
-        self.c_chess.itemconfigure(self.selected_piece, fill=self.txt_map_color(x)[1])  # set constant red
+        if self.currently_selected.get() != 'exit':
+            self.position1 = self.currently_selected.get()
+            print('position1=' + self.position1)
+            self.selected_piece = self.c_chess.find_withtag(f'piece_{self.position1}')  # get id of selected piece
+            print('id=' + str(self.selected_piece))
+            self.c_chess.itemconfigure(self.selected_piece, fill=self.txt_map_color(x)[1])  # set constant red
 
-        self.c_chess.itemconfigure('piece', state=tk.DISABLED)  # initialize select square
-        for i in self.generate_valid_position2(x):  # activate only valid movement squares
-            self.c_chess.itemconfigure('square_' + i, state=tk.NORMAL)
-        print('waiting for position2')
+            self.c_chess.itemconfigure('piece', state=tk.DISABLED)  # initialize select square
+            for i in self.generate_valid_position2(x):  # activate only valid movement squares
+                self.c_chess.itemconfigure('square_' + i, state=tk.NORMAL)
+            print('waiting for position2')
 
-        # in this timeframe there's possibility to reset selection
-        self.c_chess.wait_variable(self.currently_selected)
+            # in this timeframe there's possibility to reset selection
+            self.c_chess.wait_variable(self.currently_selected)
 
-        if self.selected_piece is not None:
-            self.position2 = self.currently_selected.get()
-            print('position2=' + self.position2)
+            if self.selected_piece is not None and self.currently_selected.get() != 'exit':
+                self.position2 = self.currently_selected.get()
+                print('position2=' + self.position2)
 
-            if not self.virtual_move_results_check(x):
-                # if capture happens
-                if self.chess_board[self.position2] != '  ':
-                    first_empty_slot = self.captured_pieces[self.other_player].index('  ')
-                    # backend, copying position2 piece to other player's captured list
-                    self.captured_pieces[self.other_player][first_empty_slot] = self.chess_board[self.position2]
-                    # copy captured piece to captured canvas
-                    self.c_captured[self.other_player].itemconfigure(
-                        self.c_captured[self.other_player].find_withtag('captured_' + str(first_empty_slot)),
-                        text=self.txt_map_piece(self.chess_board[self.position2][1]))
-                    # get id of captured piece
-                    self.captured_piece = self.c_chess.find_withtag(f'piece_{self.position2}')
-                    print('captured id=' + str(self.captured_piece))
-                    # delete captured piece from chess board
-                    self.c_chess.delete(self.captured_piece)
+                if not self.virtual_move_results_check(x):
+                    # if capture happens
+                    if self.chess_board[self.position2] != '  ':
+                        first_empty_slot = self.captured_pieces[self.other_player].index('  ')
+                        # backend, copying position2 piece to other player's captured list
+                        self.captured_pieces[self.other_player][first_empty_slot] = self.chess_board[self.position2]
+                        # copy captured piece to captured canvas
+                        self.c_captured[self.other_player].itemconfigure(
+                            self.c_captured[self.other_player].find_withtag('captured_' + str(first_empty_slot)),
+                            text=self.txt_map_piece(self.chess_board[self.position2][1]))
+                        # get id of captured piece
+                        self.captured_piece = self.c_chess.find_withtag(f'piece_{self.position2}')
+                        print('captured id=' + str(self.captured_piece))
+                        # delete captured piece from chess board
+                        self.c_chess.delete(self.captured_piece)
 
-                # backend, moving piece in the chess dictionary
-                self.chess_board[self.position2] = self.chess_board[self.position1]
-                self.chess_board[self.position1] = '  '
-                self.c_chess.coords(self.selected_piece, self.get_square_center(self.position2))  # moving piece
-                self.c_chess.itemconfigure(self.selected_piece, fill=self.txt_map_color(x)[0])  # set original color
-                print('old tags=' + str(self.c_chess.gettags(self.selected_piece)))
-                self.c_chess.itemconfigure(self.selected_piece,
-                                           tag=('piece', f'piece_{self.position2}', x))  # update tag of piece
-                print('new tags=' + str(self.c_chess.gettags(self.selected_piece)))
-                self.selected_piece = None
-            else:
-                tk.messagebox.showwarning(title='Illegal move',
-                                          message='Movement leaves or places the king in check!')
-                self.reset_selection()
+                    # backend, moving piece in the chess dictionary
+                    self.chess_board[self.position2] = self.chess_board[self.position1]
+                    self.chess_board[self.position1] = '  '
+                    self.c_chess.coords(self.selected_piece, self.get_square_center(self.position2))  # moving piece
+                    self.c_chess.itemconfigure(self.selected_piece, fill=self.txt_map_color(x)[0])  # set original color
+                    print('old tags=' + str(self.c_chess.gettags(self.selected_piece)))
+                    self.c_chess.itemconfigure(self.selected_piece,
+                                               tag=('piece', f'piece_{self.position2}', x))  # update tag of piece
+                    print('new tags=' + str(self.c_chess.gettags(self.selected_piece)))
+                    self.selected_piece = None
+                else:
+                    tk.messagebox.showwarning(title='Illegal move',
+                                              message='Movement leaves or places the king in check!')
+                    self.reset_selection()
+                self.display_board()
 
     def reset_selection(self):
-        print('reset callback in use')
         if self.selected_piece is not None:
+            print('resetting selected piece')
             self.c_chess.itemconfigure(self.selected_piece, fill=self.txt_map_color(self.current_player)[0])
             self.selected_piece = None
             self.currently_selected.set('reset')  # substitute anticipated position2 with a reset flag
+        else:
+            print('no piece to reset')
 
     def flip_player(self):
         if self.currently_selected.get() != 'reset':
@@ -393,11 +415,11 @@ class Chess:
 
     def generate_valid_position2(self, x):
         valid_position2 = []
-        for j in self.chess_board_keys:
-            self.position2 = j
+        for k in self.chess_board_keys:
+            self.position2 = k
             if self.check_game_rules() and \
                     self.chess_board[self.position2] not in [x + 'T', x + 'f', x + 'A', x + '+', x + '*', x + 'i']:
-                valid_position2.append(j)
+                valid_position2.append(k)
         return valid_position2
 
     def check_game_rules(self):
@@ -547,13 +569,7 @@ class Chess:
         chess_board_virtual = self.chess_board.copy()  # shallow copy
         chess_board_virtual[self.position2] = chess_board_virtual[self.position1]
         chess_board_virtual[self.position1] = '  '
-        king_position = None
-        for i in self.chess_board_keys:
-            if chess_board_virtual[i] == x + '+':
-                king_position = i
-        if self.coord_danger_from(king_position, chess_board_virtual, x):
-            return True
-        return False
+        return self.king_in_check(x, chess_board_virtual)
 
     # checks if xn coordinate of x player on board is under attack from enemy and returns enemy's coordinates
     def coord_danger_from(self, xn, board, x):
@@ -730,6 +746,62 @@ class Chess:
             for i in threat_coordinates:
                 if board[i] == 'wi':
                     return i
+
+    def check_if_game_still_going(self):
+        if self.currently_selected.get() != 'exit':
+            if self.check_for_checkmate(self.current_player):
+                self.game_still_going = False
+                self.c_chess.itemconfigure('square', state=tk.DISABLED)
+                self.winner = self.other_player
+            elif self.check_for_stalemate(self.current_player):
+                self.game_still_going = False
+                self.c_chess.itemconfigure('square', state=tk.DISABLED)
+
+    def check_for_checkmate(self, x):
+        if not self.legal_move_possible(x) and self.king_in_check(x, self.chess_board):
+            return True
+        return False
+
+    def check_for_stalemate(self, x):
+        if not self.legal_move_possible(x):
+            return True
+        return False
+
+    def legal_move_possible(self, x):
+        current_player_positions = []
+        for i in self.chess_board_keys:
+            if self.chess_board[i][0] == x:
+                current_player_positions.append(i)
+        for i in current_player_positions:
+            self.position1 = i
+            for j in self.chess_board_keys:
+                self.position2 = j
+                if self.chess_board[self.position2] not in [x + 'T', x + 'f', x + 'A', x + '+', x + '*', x + 'i'] and \
+                        self.check_game_rules() and not self.virtual_move_results_check(x):
+                    return True
+        return False
+
+    def king_in_check(self, x, board):
+        king_position = None
+        for i in self.chess_board_keys:
+            if board[i] == x + '+':
+                king_position = i
+        if self.coord_danger_from(king_position, board, x):
+            return True
+        return False
+
+    def ask_for_new_game(self):
+        if self.currently_selected.get() != 'exit':
+            if self.winner == 'w':
+                message = 'White wins the game.'
+            elif self.winner == 'b':
+                message = 'Black wins the game.'
+            else:
+                message = 'The game is a draw.'
+            start_new_game = tk.messagebox.askyesno(title='End of game', message=message, detail='Start new game?')
+            if not start_new_game:
+                print('Exiting chess')
+                self.master.destroy()
 
 
 if __name__ == '__main__':
