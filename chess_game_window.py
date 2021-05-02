@@ -14,7 +14,7 @@ class Chess:
     def __init__(self, master):
         self.master = master
         self.master.title('Chess Game')
-        self.screen_size = (1366, 768)  # other (1024, 576)(1366, 768)(1920, 1080)
+        self.screen_size = (1024, 576)  # other (1024, 576)(1366, 768)(1920, 1080)
         # 2 blue edge, 50 bar and menu, 40 tray = 92
         self.master.minsize(self.screen_size[0] - 2, self.screen_size[1] - 92)
         self.master.maxsize(self.screen_size[0] - 2, self.screen_size[1] - 92)
@@ -51,12 +51,49 @@ class Chess:
 
         self.play_game()
 
+    def display_board(self):
+        print('-----------------------------------------------')
+        print('Captured black pieces: ')
+        for i in range(16):
+            if i != 15:
+                print(self.captured_pieces['b'][i], end=' ')
+            else:
+                print(self.captured_pieces['b'][i])
+        print('-----------------------------------------------')
+        print('--|----|----|----|----|----|----|----|----|')
+        for i in self.chess_board_keys:
+            if i not in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8']:
+                if i in ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8']:
+                    print(str(i)[1] + ' | ' + self.chess_board[i] + ' | ', end='')
+                else:
+                    print(self.chess_board[i] + ' | ', end='')
+            else:
+                print(self.chess_board[i] + ' | ')
+                print('--|----|----|----|----|----|----|----|----|')
+        for i in char_range('a', 'h'):
+            if i != 'h':
+                if i == 'a':
+                    print('X' + ' | ' + i + '  | ', end='')
+                else:
+                    print(i + '  | ', end='')
+            else:
+                print(str(i) + '  | ')
+        print('-----------------------------------------------')
+        print('Captured white pieces: ')
+        for i in range(16):
+            if i != 15:
+                print(self.captured_pieces['w'][i], end=' ')
+            else:
+                print(self.captured_pieces['w'][i])
+        print('-----------------------------------------------')
+
     def play_game(self):
         self.load_board_setup('initial_setup.txt')
         self.draw_menu()
         self.draw_4_main_canvas()
         self.draw_chess_board()
         self.draw_captured()
+        self.draw_captured_pieces()
         self.draw_squares()
         self.initialize_pieces()    # draw included
         self.play_dual()
@@ -82,7 +119,8 @@ class Chess:
         other_player_value = other_player_line.split('=')[1]
         self.other_player = other_player_value
         file.close()
-        self.chess_keys = list(self.chess_board.keys())
+        self.chess_board_keys = list(self.chess_board.keys())
+        # print(self.captured_pieces)
 
     def draw_menu(self):
         self.master.option_add('*tearOff', False)
@@ -116,6 +154,11 @@ class Chess:
         self.c_right_center.grid(column=2, row=2, padx=(5, 0), pady=5)
         self.separator3.grid(column=2, row=3, sticky='w, e')
         self.c_right_bottom.grid(column=2, row=4, padx=(5, 0), pady=(5, 0))
+
+        self.current_player_label = self.c_right_center.create_text(
+                                    self.c_right_width / 2, self.c_right_center_height / 2,
+                                    text='White is next to move', fill=self.font_color,
+                                    font=(self.font_type, self.font_size))
 
         self.master.bind('<Button-3>', lambda e: self.reset_selection())
 
@@ -157,13 +200,45 @@ class Chess:
         self.c_captured = {}  # creating two areas for captured pieces
         for color, parent in [('w', self.c_right_bottom), ('b', self.c_right_top)]:
             self.c_captured[color] = tk.Canvas(parent, width=self.square_size * 8,
-                                          height=self.square_size * 2, bg='orange', highlightthickness=0)
+                                               height=self.square_size * 2, bg=self.abc123_color,
+                                               highlightthickness=0)
         for color, y in [('b', self.square_size), ('w', self.c_right_top_height - self.square_size * 3)]:
-            self.c_captured[color].place(anchor='n', height=self.square_size * 2, width=self.square_size * 8,
+            self.c_captured[color].place(anchor='n',
                                          x=self.c_right_width / 2, y=y)
 
+        self.c_right_top.create_text(self.c_right_width / 2, self.square_size / 2,
+                                     text='Captured black pieces', fill=self.font_color,
+                                     font=(self.font_type, self.font_size))
+
+        self.c_right_bottom.create_text(self.c_right_width / 2, self.c_right_top_height - self.square_size / 2,
+                                        text='Captured white pieces', fill=self.font_color,
+                                        font=(self.font_type, self.font_size))
+
+    def get_captured_center(self, number):
+        if number < 8:
+            x = (number + 0.5) * self.square_size
+            y = self.square_size * 0.5
+        else:
+            x = (number - 7.5) * self.square_size
+            y = self.square_size * 1.5
+        return x, y
+
+    def draw_captured_pieces(self):
+        for color in ['b', 'w']:
+            for i in range(0, 16):
+                self.c_captured[color].create_text(
+                    self.get_captured_center(i),
+                    text=self.txt_map_piece(self.captured_pieces[color][i][1]),
+                    tag=f'captured_{str(i)}',
+                    fill=self.txt_map_color(color)[0],
+                    activefill=self.txt_map_color(color)[1],
+                    font=(self.font_type, self.piece_size),
+                    state=tk.DISABLED)
+        # for i in range(1, 17):
+        #     print(self.c_captured['w'].gettags(i))
+
     def draw_squares(self):
-        for i in self.chess_keys:
+        for i in self.chess_board_keys:
             x0 = (ord(i[0]) - 97) * self.square_size
             y0 = abs(int(i[1]) - 8) * self.square_size
             x1 = (ord(i[0]) - 96) * self.square_size
@@ -179,7 +254,7 @@ class Chess:
             # e not used but always created as event, so a new kw parameter n is created which is local to lambda
             self.c_chess.tag_bind('square_' + i, '<Button-1>', lambda e, n=i: self.currently_selected.set(n))
 
-    def get_center(self, tag):
+    def get_square_center(self, tag):
         x0 = self.c_chess.coords(self.c_chess.find_withtag('square_' + tag))[0]
         y0 = self.c_chess.coords(self.c_chess.find_withtag('square_' + tag))[1]
         x1 = self.c_chess.coords(self.c_chess.find_withtag('square_' + tag))[2]
@@ -209,7 +284,7 @@ class Chess:
             return self.dark_piece_color, self.dark_piece_highlight
 
     def initialize_pieces(self):
-        for i in self.chess_board:
+        for i in self.chess_board_keys:
             if self.chess_board[i] != '  ':
                 if self.chess_board[i][0] == 'w':
                     self.draw_pieces(i, 'w')
@@ -220,7 +295,7 @@ class Chess:
 
     def draw_pieces(self, pos, color):
         self.c_chess.create_text(
-            self.get_center(pos),
+            self.get_square_center(pos),
             text=self.txt_map_piece(self.chess_board[pos][1]),
             tag=('piece', 'piece_' + pos, color),
             fill=self.txt_map_color(color)[0],
@@ -233,10 +308,16 @@ class Chess:
             self.flip_player()
 
     def handle_turn(self, x):
+        # for i in range(1, 97):
+        #     print(i, end=' ')
+        #     print(self.c_chess.gettags(i))
+        self.display_board()
         if x == 'w':
-            print('White is next to move')     # todo make it a canvas text
+            print('White is next to move')
+            self.c_right_center.itemconfigure(self.current_player_label, text='White is next to move')
         elif x == 'b':
             print('Black is next to move')
+            self.c_right_center.itemconfigure(self.current_player_label, text='Black is next to move')
 
         self.c_chess.itemconfigure('piece', state=tk.DISABLED)      # initialize select piece
         self.c_chess.itemconfigure('square', state=tk.DISABLED)
@@ -257,7 +338,25 @@ class Chess:
         if self.selected_piece is not None:
             self.position2 = self.currently_selected.get()
             print('position2=' + self.position2)
-            self.c_chess.coords(self.selected_piece, self.get_center(self.position2))    # movement of piece
+            # if capture happens
+            if self.chess_board[self.position2] != '  ':
+                first_empty_slot = self.captured_pieces[self.other_player].index('  ')
+                # backend, copying position2 piece to other player's captured list
+                self.captured_pieces[self.other_player][first_empty_slot] = self.chess_board[self.position2]
+                # copy captured piece to captured canvas
+                self.c_captured[self.other_player].itemconfigure(
+                    self.c_captured[self.other_player].find_withtag('captured_' + str(first_empty_slot)),
+                    text=self.txt_map_piece(self.chess_board[self.position2][1]))
+                # get id of captured piece
+                self.captured_piece = self.c_chess.find_withtag(f'piece_{self.position2}')
+                print('captured id=' + str(self.captured_piece))
+                # delete captured piece from chess board
+                self.c_chess.delete(self.captured_piece)
+            # backend, moving piece in the chess dictionary
+            self.chess_board[self.position2] = self.chess_board[self.position1]
+            self.chess_board[self.position1] = '  '
+
+            self.c_chess.coords(self.selected_piece, self.get_square_center(self.position2))    # moving piece
             self.c_chess.itemconfigure(self.selected_piece, fill=self.txt_map_color(x)[0])  # set original color
             print('old tags=' + str(self.c_chess.gettags(self.selected_piece)))
             self.c_chess.itemconfigure(self.selected_piece,
