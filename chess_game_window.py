@@ -56,7 +56,7 @@ class Chess:
     def play_game(self):
         self.clear_previous_session()
         self.load_board_setup()
-        self.display_board()  # legacy backend in terminal
+        self.display_board()  # legacy display in terminal
         self.draw_menu()
         self.draw_4_main_canvas()
         self.draw_chess_board()
@@ -114,6 +114,7 @@ class Chess:
             self.other_player = self.other_player_c
             self.these_rook_king_moved = self.these_rook_king_moved_c.copy()
             self.en_pass_pos = self.en_pass_pos_c.copy()
+            self.number_of_player = self.number_of_player_c
 
     def display_board(self):
         print('-----------------------------------------------')
@@ -190,6 +191,7 @@ class Chess:
             self.other_player_c = self.other_player
             self.these_rook_king_moved_c = self.these_rook_king_moved.copy()
             self.en_pass_pos_c = self.en_pass_pos.copy()
+            self.number_of_player_c = self.number_of_player
             self.game_still_going = False
             self.file_to_load = path
             self.currently_selected.set('exit')
@@ -215,7 +217,8 @@ class Chess:
             file.write('number_of_player=' + str(self.number_of_player.get()))
             file.close()
             self.game_is_saved = True
-            print('game saved')
+            print('Game is saved')
+            return True
 
     def exit_game(self):
         def exiting():
@@ -232,8 +235,8 @@ class Chess:
         else:
             save_response = tk.messagebox.askyesno(title='Save game', message='Do you want to save before exit?')
             if save_response:
-                self.save_game()
-                exiting()
+                if self.save_game():    # user didn't click on cancel, otherwise no exit
+                    exiting()
             else:
                 exiting()
 
@@ -930,12 +933,27 @@ class Chess:
     def check_if_game_still_going(self, x):
         if self.currently_selected.get() != 'exit':
             legal_move = self.legal_move_possible(x)    # to prevent running the method twice
+            all_player_pos = {self.chess_board[i]: i for i in self.chess_board_keys if self.chess_board[i] != '  '}
             if not legal_move and self.king_in_check(x, self.chess_board):  # checkmate
                 self.game_still_going = False
                 self.c_chess.itemconfigure('square', state=tk.DISABLED)
                 self.winner = self.other_player
             elif not legal_move:                                            # stalemate
                 self.game_still_going = False
+                self.c_chess.itemconfigure('square', state=tk.DISABLED)
+            # other stalemates:
+            elif {'w+', 'b+'} == set(all_player_pos):
+                self.game_still_going = False       # only king - king left
+                self.c_chess.itemconfigure('square', state=tk.DISABLED)
+            elif {'w+', 'b+', 'wA'} == set(all_player_pos) or {'w+', 'b+', 'bA'} == set(all_player_pos):
+                self.game_still_going = False       # only king - king+bishop left
+                self.c_chess.itemconfigure('square', state=tk.DISABLED)
+            elif {'w+', 'b+', 'wf'} == set(all_player_pos) or {'w+', 'b+', 'bf'} == set(all_player_pos):
+                self.game_still_going = False       # only king - king+knight left
+                self.c_chess.itemconfigure('square', state=tk.DISABLED)
+            elif {'w+', 'b+', 'wA', 'bA'} == set(all_player_pos) and \
+                    self.pos_map_color(all_player_pos['wA']) == self.pos_map_color(all_player_pos['bA']):
+                self.game_still_going = False       # only king+bishop - king+bishop left, with bishops on same color
                 self.c_chess.itemconfigure('square', state=tk.DISABLED)
 
     def legal_move_possible(self, x):
