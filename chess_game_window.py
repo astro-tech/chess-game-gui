@@ -739,7 +739,8 @@ class Chess:
             print(dgr_values_before, end=',')
             print(dgr_values_after, end=',')
             print(player + ',' + str(ops[comp](sum(dgr_values_before), sum(dgr_values_after))))
-            return ops[comp](sum(dgr_values_before), sum(dgr_values_after))
+            return {'r': ops[comp](sum(dgr_values_before), sum(dgr_values_after)),
+                    'b': sum(dgr_values_before), 'a': sum(dgr_values_after)}
 
         self.display_next_player(x)
         strategy = 'None'
@@ -781,7 +782,7 @@ class Chess:
                                     [x + 'T', x + 'f', x + 'A', x + '+', x + '*', x + 'i'] \
                                     and self.check_legal_move() and not self.virtual_move_results_check(x) and \
                                     not self.coord_danger_from(self.position2, self.chess_board_virtual, x) and \
-                                    piece_dgr_values_check(self.chess_board, self.chess_board_virtual, x, '>='):
+                                    piece_dgr_values_check(self.chess_board, self.chess_board_virtual, x, '>=')['r']:
                                 strategy_found = True
                                 strategy = '3: Retreating to safe place'
                                 break
@@ -830,7 +831,8 @@ class Chess:
                 strategy_found = True
                 strategy = '7: Attack with En passant'
         # if not under attack or previous moves not found, it tries to move to safe place towards opponent's king
-        # so that the sum of values of pieces in danger don't increase (8th)
+        # so that the sum of values of current pieces in danger don't increase, but the opponent's value increases
+        # as much as possible (8th)
         if not strategy_found:
             safe_position2s = [i for i in self.chess_board_keys if not self.coord_danger_from(i, self.chess_board, x)
                                and self.chess_board[i] not in [x + 'T', x + 'f', x + 'A', x + '+', x + '*', x + 'i']]
@@ -841,23 +843,27 @@ class Chess:
             dist_add_pos2s = {pos: measure_dist(oth_king_pos, pos) for pos in safe_position2s}
             dist_ordered_pos2s = [pos for i in range(1, 101) for pos in dist_add_pos2s if dist_add_pos2s[pos] == i / 10]
             randomized_curr_player_pos = random.sample(curr_player_pos, len(curr_player_pos))
+            eight = {}
             for self.position1 in randomized_curr_player_pos:
                 for self.position2 in dist_ordered_pos2s:
                     if self.check_legal_move() and not self.virtual_move_results_check(x) and \
-                            piece_dgr_values_check(self.chess_board, self.chess_board_virtual, self.other_player, '<') \
-                            and piece_dgr_values_check(self.chess_board, self.chess_board_virtual, x, '>='):
-                        strategy_found = True
-                        strategy = '8: Move to safe place, try to prepare future attack'
-                        break
-                else:
-                    continue
-                break
+                            piece_dgr_values_check(self.chess_board, self.chess_board_virtual, x, '>=')['r']:
+                        eight[(self.position1, self.position2)] = piece_dgr_values_check(   # value assign to moves
+                            self.chess_board, self.chess_board_virtual, self.other_player, '<')['a']
+            sorted_eight = sorted(eight.items(), key=lambda i: i[1], reverse=True)  # if eight still empty, returns []
+            if sorted_eight and sorted_eight[0][1] > piece_dgr_values_check(    # if greatest value after > before
+                    self.chess_board, self.chess_board_virtual, self.other_player, '<')['b']:
+                strategy_found = True
+                strategy = '8: Move to safe place, try to prepare future attack'
+                self.position1 = sorted_eight[0][0][0]
+                self.position2 = sorted_eight[0][0][1]
+            print(sorted_eight)
             # tries once more, but without increasing the the sum of value of the opponent's pieces in danger (9th)
             if not strategy_found:
                 for self.position1 in randomized_curr_player_pos:
                     for self.position2 in dist_ordered_pos2s:
                         if self.check_legal_move() and not self.virtual_move_results_check(x) and \
-                                piece_dgr_values_check(self.chess_board, self.chess_board_virtual, x, '>='):
+                                piece_dgr_values_check(self.chess_board, self.chess_board_virtual, x, '>=')['r']:
                             strategy_found = True
                             strategy = '9: Move to safe place'
                             break
