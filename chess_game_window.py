@@ -19,32 +19,35 @@ class Chess:
         self.master.minsize(self.screen_size[0] - 2, self.screen_size[1] - 92)
         self.master.maxsize(self.screen_size[0] - 2, self.screen_size[1] - 92)
         self.master.geometry(f'{self.screen_size[0] - 2}x{self.screen_size[1] - 92}+0+0')
-        # widgets parameters
-        self.canvas_widgets_color = 'grey75'
-        self.abc123_color = 'grey50'
+        # widget parameters
+        self.canvas_color = {'light': 'grey75', 'medium': 'grey50'}
         # square parameters
         self.square_size = int(self.screen_size[1] / 10.97)  # 70 for 1366x768
-        self.light_squares_color = '#fef0d6'
-        self.light_squares_highlight = '#ff836b'
-        self.dark_squares_color = '#7d564a'
-        self.dark_squares_highlight = '#be3625'
+        self.square_color = {'light': '#fef0d6', 'light_hl': '#ff836b', 'dark': '#7d564a', 'dark_hl': '#be3625',
+                             'l_green': '#7ff86b', 'd_green': '#3eab25'}
         # piece parameters
         self.piece_size = int(self.square_size * (5 / 7))  # 50 for 1366x768
-        self.light_piece_color = '#d2ac79'
-        self.light_piece_highlight = '#f4541e'
-        self.dark_piece_color = '#2a1510'
-        self.dark_piece_highlight = '#ca2e04'
-        # font parameters
-        self.font_size = int(self.square_size / 3.5)  # 20 for 1366x768
-        self.font_color = 'black'
-        self.font_type = 'TKDefaultFont'
+        self.piece_color = {'light': '#d2ac79', 'light_hl': '#f4541e', 'dark': '#2a1510', 'dark_hl': '#ca2e04'}
+        # font parameters (size 20 for 1366x768)
+        self.font = {'size': int(self.square_size / 3.5), 'color': 'black', 'type': 'TKDefaultFont'}
 
+        self.chess_board = {}
+        self.captured_pieces = {}
+        self.current_player = None
+        self.other_player = None
+        self.these_rook_king_moved = []
         self.currently_selected = tk.StringVar()
-        self.start_new_game = True
+        self.show_legal_moves = tk.BooleanVar(value=True)
         self.file_to_load = 'initial_setup.txt'
+        self.position1 = None
+        self.position2 = None
+        self.selected_piece = None
+        self.game_still_going = True
+        self.winner = None
         self.castling_rook = None  # tempo info holder for castling
         self.king_position = None  # tempo info holder for castling
 
+        self.start_new_game = True
         while self.start_new_game:
             self.play_game()
 
@@ -71,18 +74,8 @@ class Chess:
             self.check_if_game_still_going()
 
     def clear_previous_session(self):
-        self.chess_board = {}
-        self.captured_pieces = {}
-        self.current_player = None
-        self.other_player = None
-        # self.selected_piece = None
-        self.position1 = '  '
-        self.position2 = '  '
-        self.these_rook_king_moved = ['']
         self.game_still_going = True
         self.winner = None
-        # self.start_new_game = True
-
         for i in self.master.winfo_children():
             print('destroying' + str(i))
             i.destroy()
@@ -130,6 +123,7 @@ class Chess:
             for line in data[0:64]:
                 (key, value) = line.split('=')
                 self.chess_board[key] = value  # importing full chess board data (old generate board)
+            # print(self.chess_board)
             for color in ['w', 'b']:
                 self.captured_pieces[color] = []
             for line in data[65:81]:
@@ -145,6 +139,7 @@ class Chess:
             other_player_line = data[98]
             other_player_value = other_player_line.split('=')[1]
             self.other_player = other_player_value
+            # print(self.current_player + ', ' + self.other_player)
             rook_king_moved_line = data[99]
             rook_king_moved_string = rook_king_moved_line.split('=')[1]
             self.these_rook_king_moved = rook_king_moved_string.split(',')
@@ -155,13 +150,13 @@ class Chess:
             tk.messagebox.showerror(title='Error', message='initial_setup.txt is missing from game directory!')
             self.master.destroy()
         except IndexError:
+            print('Game file is corrupted!')
+            tk.messagebox.showerror(title='Error', message='Game file is corrupted!')
             self.chess_board = self.chess_board2.copy()
             self.captured_pieces = self.captured_pieces2.copy()
             self.current_player = self.current_player2
             self.other_player = self.other_player2
             self.these_rook_king_moved = self.these_rook_king_moved2.copy()
-            print('Wrong file opened!')
-            tk.messagebox.showerror(title='Error', message='Saved game file is corrupted!')
 
     def draw_menu(self):
         self.master.option_add('*tearOff', False)
@@ -177,6 +172,7 @@ class Chess:
         self.file_menu.add_separator()
         self.file_menu.add_command(label='Exit', command=self.exit_game)
         self.options_menu.add_command(label='Board size')
+        self.options_menu.add_command(label='Settings', command=self.settings_dialog)
 
         self.castling_menu = tk.Menu(self.master)
         self.castling_menu.add_command(label='Castling', command=self.castling)
@@ -213,6 +209,35 @@ class Chess:
             print('Exiting chess')
             self.master.destroy()
 
+    def settings_dialog(self):
+        show_legal_moves2 = tk.BooleanVar(value=self.show_legal_moves.get())
+        settings_selected = tk.BooleanVar()
+
+        settings_window = tk.Toplevel(self.master)
+        settings_window.title('Settings')
+        settings_window.resizable(False, False)
+        settings_window.protocol("WM_DELETE_WINDOW", lambda: settings_selected.set(True))
+
+        settings_frame = ttk.Frame(settings_window, padding=10)
+        settings_frame.grid(column=0, row=0, sticky='n, w, e, s')
+
+        message = ttk.Label(settings_frame, text='Highlight legal movement squares with green:', padding=10)
+        message.grid(column=0, row=0, columnspan=3, sticky='n, w, s')
+        legal_moves_button = ttk.Checkbutton(settings_frame, variable=show_legal_moves2,
+                                             onvalue=True, offvalue=False, padding=10)
+        legal_moves_button.grid(column=3, row=0, sticky='n, e, s')
+
+        def apply_button_logic():
+            self.show_legal_moves.set(show_legal_moves2.get())
+            settings_selected.set(True)
+        apply_button = ttk.Button(settings_frame, text='Apply', command=apply_button_logic)
+        cancel_button = ttk.Button(settings_frame, text='Cancel', command=lambda: settings_selected.set(True))
+        apply_button.grid(column=2, row=2, sticky='n, e, s')
+        cancel_button.grid(column=3, row=2, sticky='n, s')
+
+        root.wait_variable(settings_selected)
+        settings_window.destroy()
+
     def draw_4_main_canvas(self):
         self.c_left_side = self.screen_size[1] - 100  # 92 plus 3 + 5
         self.c_right_width = self.screen_size[0] - self.c_left_side - 24  # 2blue edge,12separator, 5,5 pad x
@@ -224,7 +249,7 @@ class Chess:
         self.c_right_bottom = tk.Canvas(self.master, width=self.c_right_width, height=self.c_right_top_height)
         self.c_right_center = tk.Canvas(self.master, width=self.c_right_width, height=self.c_right_center_height)
         for canvas_item in [self.c_left, self.c_right_top, self.c_right_bottom, self.c_right_center]:
-            canvas_item['bg'] = self.canvas_widgets_color
+            canvas_item['bg'] = self.canvas_color['light']
             canvas_item['highlightthickness'] = 0
         self.separator1 = ttk.Separator(self.master, orient='vertical')
         self.separator2 = ttk.Separator(self.master, orient='horizontal')
@@ -240,8 +265,8 @@ class Chess:
 
         self.current_player_label = self.c_right_center.create_text(
             self.c_right_width / 2, self.c_right_center_height / 2,
-            text='White is next to move', fill=self.font_color,
-            font=(self.font_type, self.font_size))
+            text='White is next to move', fill=self.font['color'],
+            font=(self.font['type'], self.font['size']))
 
         self.master.bind('<Button-3>', lambda e: self.reset_selection())
         self.master.bind('<Escape>', lambda e: self.reset_selection())
@@ -250,25 +275,25 @@ class Chess:
         self.c_123abc_w = (self.c_left_side - self.square_size * 8) / 2  # strip width of 1-8, a-h
 
         self.c_chess = tk.Canvas(self.c_left, width=self.square_size * 8, height=self.square_size * 8,
-                                 bg=self.canvas_widgets_color)
+                                 bg=self.canvas_color['light'])
 
         self.board_abcx2 = {}  # creating two rows of letters a-h
         for i in ['n', 's']:
             self.board_abcx2[i] = tk.Canvas(self.c_left, width=self.square_size * 8,
-                                            height=self.c_123abc_w, bg=self.abc123_color)
+                                            height=self.c_123abc_w, bg=self.canvas_color['medium'])
             for j in char_range('a', 'h'):
                 self.board_abcx2[i].create_text(
                     self.square_size * (ord(j) - 96.5), self.c_123abc_w / 2,
-                    text=j, fill=self.font_color, font=(self.font_type, self.font_size))
+                    text=j, fill=self.font['color'], font=(self.font['type'], self.font['size']))
 
         self.board_123x2 = {}  # creating two columns of numbers 1-8
         for i in ['w', 'e']:
             self.board_123x2[i] = tk.Canvas(self.c_left, width=self.c_123abc_w,
-                                            height=self.c_left_side, bg=self.abc123_color)
+                                            height=self.c_left_side, bg=self.canvas_color['medium'])
             for j in range(0, 8):
                 self.board_123x2[i].create_text(
                     self.c_123abc_w / 2, self.c_left_side - self.c_123abc_w - self.square_size * (j + 0.5),
-                    text=j + 1, fill=self.font_color, font=(self.font_type, self.font_size))
+                    text=j + 1, fill=self.font['color'], font=(self.font['type'], self.font['size']))
 
         for canvas_item in [self.c_chess, self.board_abcx2['n'], self.board_abcx2['s'],
                             self.board_123x2['w'], self.board_123x2['e']]:
@@ -284,19 +309,19 @@ class Chess:
         self.c_captured = {}  # creating two areas for captured pieces
         for color, parent in [('w', self.c_right_bottom), ('b', self.c_right_top)]:
             self.c_captured[color] = tk.Canvas(parent, width=self.square_size * 8,
-                                               height=self.square_size * 2, bg=self.abc123_color,
+                                               height=self.square_size * 2, bg=self.canvas_color['medium'],
                                                highlightthickness=0)
         for color, y in [('b', self.square_size), ('w', self.c_right_top_height - self.square_size * 3)]:
             self.c_captured[color].place(anchor='n',
                                          x=self.c_right_width / 2, y=y)
 
         self.c_right_top.create_text(self.c_right_width / 2, self.square_size / 2,
-                                     text='Captured black pieces', fill=self.font_color,
-                                     font=(self.font_type, self.font_size))
+                                     text='Captured black pieces', fill=self.font['color'],
+                                     font=(self.font['type'], self.font['size']))
 
         self.c_right_bottom.create_text(self.c_right_width / 2, self.c_right_top_height - self.square_size / 2,
-                                        text='Captured white pieces', fill=self.font_color,
-                                        font=(self.font_type, self.font_size))
+                                        text='Captured white pieces', fill=self.font['color'],
+                                        font=(self.font['type'], self.font['size']))
 
     def get_captured_center(self, number):
         if number < 8:
@@ -316,10 +341,21 @@ class Chess:
                     tag=f'captured_{str(i)}',
                     fill=self.txt_map_color(color)[0],
                     activefill=self.txt_map_color(color)[1],  # not used yet
-                    font=(self.font_type, self.piece_size),
+                    font=(self.font['type'], self.piece_size),
                     state=tk.DISABLED)
         # for i in range(1, 17):
         #     print(self.c_captured['w'].gettags(i))
+
+    def pos_map_color(self, pos):
+        if (ord(pos[0]) + int(pos[1])) % 2 == 0:  # True if dark square, False if light square
+            color = self.square_color['dark']
+            act_color = self.square_color['dark_hl']
+            green_color = self.square_color['d_green']
+        else:
+            color = self.square_color['light']
+            act_color = self.square_color['light_hl']
+            green_color = self.square_color['l_green']
+        return color, act_color, green_color
 
     def draw_squares(self):
         for i in self.chess_board_keys:
@@ -327,14 +363,8 @@ class Chess:
             y0 = abs(int(i[1]) - 8) * self.square_size
             x1 = (ord(i[0]) - 96) * self.square_size
             y1 = abs(int(i[1]) - 9) * self.square_size
-            if (ord(i[0]) + int(i[1])) % 2 == 0:  # True if dark square, False if light square
-                color = self.dark_squares_color
-                act_color = self.dark_squares_highlight
-            else:
-                color = self.light_squares_color
-                act_color = self.light_squares_highlight
-            self.c_chess.create_rectangle(x0, y0, x1, y1, fill=color, width=0,
-                                          activefill=act_color, tag=('square', 'square_' + i))
+            self.c_chess.create_rectangle(x0, y0, x1, y1, fill=self.pos_map_color(i)[0], width=0,
+                                          activefill=self.pos_map_color(i)[1], tag=('square', 'square_' + i))
             # e not used but always created as event, so a new kw parameter n is created which is local to lambda
             self.c_chess.tag_bind('square_' + i, '<Button-1>', lambda e, n=i: self.currently_selected.set(n))
 
@@ -363,9 +393,9 @@ class Chess:
 
     def txt_map_color(self, color):
         if color == 'w':
-            return self.light_piece_color, self.light_piece_highlight
+            return self.piece_color['light'], self.piece_color['light_hl']
         elif color == 'b':
-            return self.dark_piece_color, self.dark_piece_highlight
+            return self.piece_color['dark'], self.piece_color['dark_hl']
 
     def initialize_pieces(self):
         for i in self.chess_board_keys:
@@ -390,7 +420,7 @@ class Chess:
             tag=tag,
             fill=self.txt_map_color(color)[0],
             activefill=self.txt_map_color(color)[1],
-            font=(self.font_type, self.piece_size))
+            font=(self.font['type'], self.piece_size))
 
     def castling_context(self, e, n):
         # castling 1. check: only Rooks respond to right click
@@ -481,7 +511,7 @@ class Chess:
         # castling 3. check: castling dialog only appears if squares empty between king and chosen rook
         if not empty_space_between_king_rook():
             tk.messagebox.showwarning(title='Castling',
-                                      message='Piece present between king and choosen rook!')
+                                      message='Piece present between king and chosen rook!')
         else:
             modify_rook_king(1)
             if self.castling_rook[0] == 'h':
@@ -531,8 +561,13 @@ class Chess:
             self.c_chess.itemconfigure(self.selected_piece, fill=self.txt_map_color(x)[1])  # set constant red
 
             self.c_chess.itemconfigure('piece', state=tk.DISABLED)  # initialize select square
-            for i in self.generate_valid_position2(x):  # activate only valid movement squares
-                self.c_chess.itemconfigure('square_' + i, state=tk.NORMAL)
+            valid_position2s = self.generate_valid_position2(x)     # activate only valid movement squares
+            if self.show_legal_moves.get():
+                color_number = 2
+            else:
+                color_number = 0
+            for i in valid_position2s:
+                self.c_chess.itemconfigure('square_' + i, state=tk.NORMAL, fill=self.pos_map_color(i)[color_number])
             print('waiting for position2')
 
             # in this timeframe there's possibility to reset selection
@@ -553,10 +588,10 @@ class Chess:
                             self.c_captured[self.other_player].find_withtag('captured_' + str(first_empty_slot)),
                             text=self.txt_map_piece(self.chess_board[self.position2][1]))
                         # get id of captured piece
-                        self.captured_piece = self.c_chess.find_withtag(f'piece_{self.position2}')
-                        print('captured id=' + str(self.captured_piece))
+                        captured_piece = self.c_chess.find_withtag(f'piece_{self.position2}')
+                        print('captured id=' + str(captured_piece))
                         # delete captured piece from chess board
-                        self.c_chess.delete(self.captured_piece)
+                        self.c_chess.delete(captured_piece)
 
                     # register first move of rook and king for castling
                     if self.chess_board[self.position1][1] == '+' or self.chess_board[self.position1][1] == 'T':
@@ -570,11 +605,11 @@ class Chess:
                     self.c_chess.coords(self.selected_piece, self.get_square_center(self.position2))  # moving piece
                     self.c_chess.itemconfigure(self.selected_piece, fill=self.txt_map_color(x)[0])  # set original color
                     print('old tags=' + str(self.c_chess.gettags(self.selected_piece)))
-                    self.c_chess.dtag(self.selected_piece, f'piece_{self.position1}')
+                    self.c_chess.dtag(self.selected_piece, f'piece_{self.position1}')   # update tag of piece
                     self.c_chess.addtag(f'piece_{self.position2}', 'withtag', self.selected_piece)
-                    # self.c_chess.itemconfigure(self.selected_piece,
-                    #                            tag=('piece', f'piece_{self.position2}', x))  # update tag of piece
                     print('new tags=' + str(self.c_chess.gettags(self.selected_piece)))
+                    for i in valid_position2s:  # set squares to original color
+                        self.c_chess.itemconfigure('square_' + i, fill=self.pos_map_color(i)[0])
                 else:
                     tk.messagebox.showwarning(title='Illegal move',
                                               message='Movement leaves or places the king in check!')
@@ -586,6 +621,8 @@ class Chess:
             print('resetting selected piece')
             self.c_chess.itemconfigure(self.selected_piece, fill=self.txt_map_color(self.current_player)[0])
             self.selected_piece = None
+            for i in self.generate_valid_position2(self.current_player):
+                self.c_chess.itemconfigure('square_' + i, fill=self.pos_map_color(i)[0])
             self.currently_selected.set('reset')  # substitute anticipated position2 with a reset flag
         else:
             print('no piece to reset')
@@ -621,13 +658,13 @@ class Chess:
                     return i
 
     def promotion_dialog(self, x):
-        button_value = tk.StringVar()
-        button_value.set('*')
-        promotion_selected = tk.StringVar()
+        button_value = tk.StringVar(value='*')
+        promotion_selected = tk.BooleanVar()
 
         promotion_window = tk.Toplevel(self.master)
         promotion_window.title('Promotion')
         promotion_window.resizable(False, False)
+        promotion_window.protocol("WM_DELETE_WINDOW", lambda: promotion_selected.set(True))
 
         promotion_frame = ttk.Frame(promotion_window, padding=10)
         promotion_frame.grid(column=0, row=0, sticky='n, w, e, s')
@@ -643,7 +680,7 @@ class Chess:
         for piece, col in [('*', 0), ('T', 1), ('A', 2), ('f', 3)]:
             buttons[piece].grid(column=col, row=1, sticky='n, w, e, s')
 
-        ok_button = ttk.Button(promotion_frame, text='Select', command=lambda: promotion_selected.set('yes'))
+        ok_button = ttk.Button(promotion_frame, text='Select', command=lambda: promotion_selected.set(True))
         ok_button.grid(column=3, row=2, sticky='n, w, e, s')
 
         root.wait_variable(promotion_selected)
