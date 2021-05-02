@@ -619,7 +619,8 @@ class Chess:
             print(f'En passant possible for {self.en_pass_pos[1]}, capture at {self.en_pass_pos[0]}')
 
     def display_next_player(self, x):
-        if self.current_player2 == 'man' and self.number_of_player.get() == 1 and self.position1:
+        if self.current_player2 == 'man' and self.number_of_player.get() == 1 and self.position1 and \
+                self.currently_selected.get() != 'reset':
             curr_speed = self.game_speed
         else:
             curr_speed = 0
@@ -711,6 +712,7 @@ class Chess:
 
     def computer_turn(self, x):
         values = {'+': 10, '*': 9, 'T': 5, 'A': 3, 'f': 3, 'i': 1}
+        ops = {'>': operator.gt, '<': operator.lt, '>=': operator.ge, '<=': operator.le}
 
         def rank_piece_dgr(d_dict):  # returns coordinates of pieces in d_dict ranked in descending values
             val_assign_piece_dgr = {key: values[d_dict[key][1]] for key in d_dict}
@@ -719,7 +721,6 @@ class Chess:
             return ranked_piece_dgr
 
         def attack_worth(dictionary, comp):
-            ops = {'>': operator.gt, '<': operator.lt, '>=': operator.ge, '<=': operator.le}
             if len(self.piece_dgr[dictionary]) == 1 or dictionary == 'oth':
                 if ops[comp](values[self.chess_board[self.position1][1]],
                              values[self.chess_board[self.position2][1]]):
@@ -730,15 +731,15 @@ class Chess:
                     return True
             return False
 
-        def piece_dgr_values_check(board1, board2):
-            dgr_values_before = [values[board1[i][1]] for i in self.chess_board_keys if board1[i][0] == x and
-                                 self.coord_danger_from(i, board1, x)]
-            dgr_values_after = [values[board2[i][1]] for i in self.chess_board_keys if board2[i][0] == x and
-                                self.coord_danger_from(i, board2, x)]
-            print(dgr_values_before)
-            print(dgr_values_after)
-            print(sum(dgr_values_before) >= sum(dgr_values_after))
-            return sum(dgr_values_before) >= sum(dgr_values_after)
+        def piece_dgr_values_check(board1, board2, player, comp):
+            dgr_values_before = [values[board1[i][1]] for i in self.chess_board_keys if board1[i][0] == player and
+                                 self.coord_danger_from(i, board1, player)]
+            dgr_values_after = [values[board2[i][1]] for i in self.chess_board_keys if board2[i][0] == player and
+                                self.coord_danger_from(i, board2, player)]
+            print(dgr_values_before, end=',')
+            print(dgr_values_after, end=',')
+            print(player + ',' + str(ops[comp](sum(dgr_values_before), sum(dgr_values_after))))
+            return ops[comp](sum(dgr_values_before), sum(dgr_values_after))
 
         self.display_next_player(x)
         strategy = 'None'
@@ -780,7 +781,7 @@ class Chess:
                                     [x + 'T', x + 'f', x + 'A', x + '+', x + '*', x + 'i'] \
                                     and self.check_legal_move() and not self.virtual_move_results_check(x) and \
                                     not self.coord_danger_from(self.position2, self.chess_board_virtual, x) and \
-                                    piece_dgr_values_check(self.chess_board, self.chess_board_virtual):
+                                    piece_dgr_values_check(self.chess_board, self.chess_board_virtual, x, '>='):
                                 strategy_found = True
                                 strategy = '3: Retreating to safe place'
                                 break
@@ -843,14 +844,27 @@ class Chess:
             for self.position1 in randomized_curr_player_pos:
                 for self.position2 in dist_ordered_pos2s:
                     if self.check_legal_move() and not self.virtual_move_results_check(x) and \
-                            piece_dgr_values_check(self.chess_board, self.chess_board_virtual):
+                            piece_dgr_values_check(self.chess_board, self.chess_board_virtual, self.other_player, '<') \
+                            and piece_dgr_values_check(self.chess_board, self.chess_board_virtual, x, '>='):
                         strategy_found = True
-                        strategy = '8: Move to safe place'
+                        strategy = '8: Move to safe place, try to prepare future attack'
                         break
                 else:
                     continue
                 break
-        # if previous strategies failed, it tries any legal move (9th)
+            # tries once more, but without increasing the the sum of value of the opponent's pieces in danger (9th)
+            if not strategy_found:
+                for self.position1 in randomized_curr_player_pos:
+                    for self.position2 in dist_ordered_pos2s:
+                        if self.check_legal_move() and not self.virtual_move_results_check(x) and \
+                                piece_dgr_values_check(self.chess_board, self.chess_board_virtual, x, '>='):
+                            strategy_found = True
+                            strategy = '9: Move to safe place'
+                            break
+                    else:
+                        continue
+                    break
+        # if previous strategies failed, it tries any legal move (10th)
         if not strategy_found:
             randomized_curr_player_pos = random.sample(curr_player_pos, len(curr_player_pos))
             randomized_chess_board_keys = random.sample(self.chess_board_keys, len(self.chess_board_keys))
@@ -858,7 +872,7 @@ class Chess:
                 for self.position2 in randomized_chess_board_keys:
                     if self.chess_board[self.position2] not in [x + 'T', x + 'f', x + 'A', x + '+', x + '*', x + 'i'] \
                             and self.check_legal_move() and not self.virtual_move_results_check(x):
-                        strategy = '9: Make any legal move'
+                        strategy = '10: Make any legal move'
                         break
                 else:
                     continue
