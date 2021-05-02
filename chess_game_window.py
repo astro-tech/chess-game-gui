@@ -47,6 +47,7 @@ class Chess:
         self.winner = None
         self.castling_rook = None  # tempo info holder for castling
         self.king_position = None  # tempo info holder for castling
+        self.game_is_saved = False
 
         self.start_new_game = True
         while self.start_new_game:
@@ -55,19 +56,22 @@ class Chess:
     def play_game(self):
         self.clear_previous_session()
         self.load_board_setup()
+        self.display_board()  # legacy backend in terminal
         self.draw_menu()
         self.draw_4_main_canvas()
         self.draw_chess_board()
-        self.draw_captured()
+        self.draw_captured_areas()
         self.draw_captured_pieces()
         self.draw_squares()
-        self.initialize_pieces()  # draw included
-        self.display_board()  # legacy backend in terminal
+        self.draw_pieces()
         while self.game_still_going:
             if (self.number_of_player.get() == 1 and self.current_player2 == 'man') or self.number_of_player.get() == 2:
                 self.handle_turn(self.current_player)
                 if self.promotion_coordinate(self.current_player):
                     self.promotion_dialog(self.current_player)
+            elif self.number_of_player.get() == 1 and self.current_player2 == 'computer':
+                print('computer turn')    # todo computer
+            self.game_is_saved = False
             self.flip_player()
             self.check_if_game_still_going(self.current_player)
         self.ask_for_new_game()
@@ -75,11 +79,43 @@ class Chess:
     def clear_previous_session(self):
         self.game_still_going = True
         self.winner = None
-        for i in self.master.winfo_children():
-            print('destroying' + str(i))
-            i.destroy()
+        for widget in self.master.winfo_children():
+            print('destroying' + str(widget))
+            widget.destroy()
 
-    def display_board(self):  # legacy backend for development purposes
+    def load_board_setup(self):
+        try:
+            file = open(self.file_to_load, 'r')
+            data = file.read().splitlines()
+            self.chess_board = {line.split('=')[0]: line.split('=')[1] for line in data[0:64]}
+            self.captured_pieces['w'] = [line.split('=')[1] for line in data[65:81]]
+            self.captured_pieces['b'] = [line.split('=')[1] for line in data[81:97]]
+            self.current_player = data[97].split('=')[1]
+            self.current_player2 = data[98].split('=')[1]
+            self.other_player = data[99].split('=')[1]
+            rook_king_moved_string = data[100].split('=')[1]
+            self.these_rook_king_moved = rook_king_moved_string.split(',')
+            en_pass_pos_string = data[101].split('=')[1]
+            self.en_pass_pos = en_pass_pos_string.split(',')
+            self.number_of_player.set(data[102].split('=')[1])
+            file.close()
+            self.chess_board_keys = list(self.chess_board.keys())
+        except FileNotFoundError as error:
+            print(error)
+            tk.messagebox.showerror(title='Error', message='initial_setup.txt is missing from game directory!')
+            self.master.destroy()
+        except IndexError:
+            print('Game file is corrupted!')
+            tk.messagebox.showerror(title='Error', message='Game file is corrupted!')
+            self.chess_board = self.chess_board_c.copy()    # restoring backups
+            self.captured_pieces = self.captured_pieces_c.copy()
+            self.current_player = self.current_player_c
+            self.current_player2 = self.current_player2_c
+            self.other_player = self.other_player_c
+            self.these_rook_king_moved = self.these_rook_king_moved_c.copy()
+            self.en_pass_pos = self.en_pass_pos_c.copy()
+
+    def display_board(self):
         print('-----------------------------------------------')
         print('Captured black pieces: ')
         for i in range(16):
@@ -115,45 +151,6 @@ class Chess:
                 print(self.captured_pieces['w'][i])
         print('-----------------------------------------------')
 
-    def load_board_setup(self):
-        try:
-            file = open(self.file_to_load, 'r')
-            data = file.read().splitlines()
-            for line in data[0:64]:
-                (key, value) = line.split('=')
-                self.chess_board[key] = value  # importing full chess board data (old generate board)
-            # print(self.chess_board)
-            for color in ['w', 'b']:
-                self.captured_pieces[color] = []
-            for line in data[65:81]:
-                value = line.split('=')[1]
-                self.captured_pieces['w'].append(value)  # importing captures white pieces data
-            for line in data[81:97]:
-                value = line.split('=')[1]
-                self.captured_pieces['b'].append(value)  # importing captures black pieces data
-            # print(self.captured_pieces)
-            self.current_player = data[97].split('=')[1]
-            self.current_player2 = data[98].split('=')[1]
-            self.other_player = data[99].split('=')[1]
-            rook_king_moved_string = data[100].split('=')[1]
-            self.these_rook_king_moved = rook_king_moved_string.split(',')
-            en_pass_pos_string = data[101].split('=')[1]
-            self.en_pass_pos = en_pass_pos_string.split(',')
-            file.close()
-            self.chess_board_keys = list(self.chess_board.keys())
-        except FileNotFoundError as error:
-            print(error)
-            tk.messagebox.showerror(title='Error', message='initial_setup.txt is missing from game directory!')
-            self.master.destroy()
-        except IndexError:
-            print('Game file is corrupted!')
-            tk.messagebox.showerror(title='Error', message='Game file is corrupted!')
-            self.chess_board = self.chess_board2.copy()
-            self.captured_pieces = self.captured_pieces2.copy()
-            self.current_player = self.current_player2
-            self.other_player = self.other_player2
-            self.these_rook_king_moved = self.these_rook_king_moved2.copy()
-
     def draw_menu(self):
         self.master.option_add('*tearOff', False)
         self.chess_menu = tk.Menu(self.master)
@@ -164,13 +161,13 @@ class Chess:
         self.chess_menu.add_cascade(label='Options', menu=self.options_menu, underline=0)
         self.file_menu.add_command(label='New Game', command=self.new_game)
         self.file_menu.add_command(label='Load Game', command=self.load_game)
-        self.file_menu.add_command(label='Save Game')
+        self.file_menu.add_command(label='Save Game', command=self.save_game)
         self.file_menu.add_separator()
         self.file_menu.add_command(label='Exit', command=self.exit_game)
         self.options_menu.add_command(label='Board size')
         self.options_menu.add_command(label='Settings', command=self.settings_dialog)
 
-        self.castling_menu = tk.Menu(self.master)
+        self.castling_menu = tk.Menu(self.master)   # context menu
         self.castling_menu.add_command(label='Castling', command=self.castling)
 
         self.master.protocol("WM_DELETE_WINDOW", lambda: self.exit_game())  # intercepting close button
@@ -186,27 +183,63 @@ class Chess:
     def load_game(self):
         path = tk.filedialog.askopenfilename(filetypes=[('Text Documents', '*.txt')])
         if path:
-            self.chess_board2 = self.chess_board.copy()  # saving backups
-            self.captured_pieces2 = self.captured_pieces.copy()
-            self.current_player2 = self.current_player
-            self.other_player2 = self.other_player
-            self.these_rook_king_moved2 = self.these_rook_king_moved.copy()
+            self.chess_board_c = self.chess_board.copy()  # saving backups
+            self.captured_pieces_c = self.captured_pieces.copy()
+            self.current_player_c = self.current_player
+            self.current_player2_c = self.current_player2
+            self.other_player_c = self.other_player
+            self.these_rook_king_moved_c = self.these_rook_king_moved.copy()
+            self.en_pass_pos_c = self.en_pass_pos.copy()
             self.game_still_going = False
             self.file_to_load = path
             self.currently_selected.set('exit')
             print('Loading game from file')
 
+    def save_game(self):
+        path = tk.filedialog.asksaveasfilename(defaultextension='.txt', filetypes=[('Text Documents', '*.txt')])
+        if path:
+            file = open(path, 'w')
+            for key in self.chess_board:
+                file.write(key + '=' + self.chess_board[key] + '\n')
+            file.write('captured pieces\n')
+            captured_indexes = {}
+            for color in ['w', 'b']:
+                captured_indexes[color] = [color + str(i) for i in range(16)]
+                for pos, value in list(zip(captured_indexes[color], self.captured_pieces[color])):
+                    file.write(pos + '=' + value + '\n')
+            file.write('current_player=' + self.current_player + '\n')
+            file.write('current_player2=' + self.current_player2 + '\n')
+            file.write('other_player=' + self.other_player + '\n')
+            file.write('these_rook_king_moved=' + ','.join(self.these_rook_king_moved) + '\n')
+            file.write('en_pass_pos=' + ','.join(self.en_pass_pos) + '\n')
+            file.write('number_of_player=' + str(self.number_of_player.get()))
+            file.close()
+            self.game_is_saved = True
+            print('game saved')
+
     def exit_game(self):
-        exit_response = tk.messagebox.askyesno(title='Quit game', message='Do you want to exit game?')
-        if exit_response:
+        def exiting():
             self.start_new_game = False
             self.game_still_going = False
             self.currently_selected.set('exit')
             print('Exiting chess')
             self.master.destroy()
 
+        if self.game_is_saved:
+            exit_response = tk.messagebox.askyesno(title='Quit game', message='Do you want to exit game?')
+            if exit_response:
+                exiting()
+        else:
+            save_response = tk.messagebox.askyesno(title='Save game', message='Do you want to save before exit?')
+            if save_response:
+                self.save_game()
+                exiting()
+            else:
+                exiting()
+
     def settings_dialog(self):
         show_legal_moves2 = tk.BooleanVar(value=self.show_legal_moves.get())
+        number_of_player2 = tk.IntVar(value=self.number_of_player.get())
         settings_selected = tk.BooleanVar()
 
         settings_window = tk.Toplevel(self.master)
@@ -217,14 +250,20 @@ class Chess:
         settings_frame = ttk.Frame(settings_window, padding=10)
         settings_frame.grid(column=0, row=0, sticky='n, w, e, s')
 
-        message = ttk.Label(settings_frame, text='Highlight legal movement squares with green:', padding=10)
-        message.grid(column=0, row=0, columnspan=3, sticky='n, w, s')
-        legal_moves_button = ttk.Checkbutton(settings_frame, variable=show_legal_moves2,
-                                             onvalue=True, offvalue=False, padding=10)
-        legal_moves_button.grid(column=3, row=0, sticky='n, e, s')
+        message1 = ttk.Label(settings_frame, text='Single player mode with computer:', padding=5)
+        message2 = ttk.Label(settings_frame, text='Highlight legal movement squares with green:', padding=5)
+        message1.grid(column=0, row=0, columnspan=3, sticky='n, w')
+        message2.grid(column=0, row=1, columnspan=3, sticky='n, w')
+        player_number_button = \
+            ttk.Checkbutton(settings_frame, variable=number_of_player2, onvalue=1, offvalue=2, padding=5)
+        legal_moves_button = \
+            ttk.Checkbutton(settings_frame, variable=show_legal_moves2, onvalue=True, offvalue=False, padding=5)
+        player_number_button.grid(column=3, row=0, sticky='n, e')
+        legal_moves_button.grid(column=3, row=1, sticky='n, e')
 
         def apply_button_logic():
             self.show_legal_moves.set(show_legal_moves2.get())
+            self.number_of_player.set(number_of_player2.get())
             settings_selected.set(True)
         apply_button = ttk.Button(settings_frame, text='Apply', command=apply_button_logic)
         cancel_button = ttk.Button(settings_frame, text='Cancel', command=lambda: settings_selected.set(True))
@@ -301,7 +340,7 @@ class Chess:
         self.board_abcx2['s'].grid(column=1, row=2)
         self.board_123x2['e'].grid(column=2, row=0, rowspan=3)
 
-    def draw_captured(self):
+    def draw_captured_areas(self):
         self.c_captured = {}  # creating two areas for captured pieces
         for color, parent in [('w', self.c_right_bottom), ('b', self.c_right_top)]:
             self.c_captured[color] = tk.Canvas(parent, width=self.square_size * 8,
@@ -319,20 +358,20 @@ class Chess:
                                         text='Captured white pieces', fill=self.font['color'],
                                         font=(self.font['type'], self.font['size']))
 
-    def get_captured_center(self, number):
-        if number < 8:
-            x = (number + 0.5) * self.square_size
-            y = self.square_size * 0.5
-        else:
-            x = (number - 7.5) * self.square_size
-            y = self.square_size * 1.5
-        return x, y
-
     def draw_captured_pieces(self):
+        def get_captured_center(number):
+            if number < 8:
+                x = (number + 0.5) * self.square_size
+                y = self.square_size * 0.5
+            else:
+                x = (number - 7.5) * self.square_size
+                y = self.square_size * 1.5
+            return x, y
+
         for color in ['b', 'w']:
             for i in range(0, 16):
                 self.c_captured[color].create_text(
-                    self.get_captured_center(i),
+                    get_captured_center(i),
                     text=self.txt_map_piece(self.captured_pieces[color][i][1]),
                     tag=f'captured_{str(i)}',
                     fill=self.txt_map_color(color)[0],
@@ -393,45 +432,44 @@ class Chess:
         elif color == 'b':
             return self.piece_color['dark'], self.piece_color['dark_hl']
 
-    def initialize_pieces(self):
+    def draw_pieces(self):
+        def drawing(pos, color):
+            if self.chess_board[pos][1] == 'T':
+                tag = ('piece', color, 'piece_' + pos, 'T')
+            else:
+                tag = ('piece', color, 'piece_' + pos)
+            self.c_chess.create_text(
+                self.get_square_center(pos),
+                text=self.txt_map_piece(self.chess_board[pos][1]),
+                tag=tag,
+                fill=self.txt_map_color(color)[0],
+                activefill=self.txt_map_color(color)[1],
+                font=(self.font['type'], self.piece_size))
+
         for i in self.chess_board_keys:
             if self.chess_board[i] != '  ':
                 if self.chess_board[i][0] == 'w':
-                    self.draw_piece(i, 'w')
+                    drawing(i, 'w')
                 elif self.chess_board[i][0] == 'b':
-                    self.draw_piece(i, 'b')
+                    drawing(i, 'b')
             # all tags has to be bound, otherwise not able to move piece after initial move
             self.c_chess.tag_bind('piece_' + i, '<Button-1>', lambda e, n=i: self.currently_selected.set(n))
             # Button-3 for Castling context menu
             self.c_chess.tag_bind('piece_' + i, '<Button-3>', lambda e, n=i: self.castling_context(e, n))
 
-    def draw_piece(self, pos, color):
-        if self.chess_board[pos][1] == 'T':
-            tag = ('piece', color, 'piece_' + pos, 'T')
-        else:
-            tag = ('piece', color, 'piece_' + pos)
-        self.c_chess.create_text(
-            self.get_square_center(pos),
-            text=self.txt_map_piece(self.chess_board[pos][1]),
-            tag=tag,
-            fill=self.txt_map_color(color)[0],
-            activefill=self.txt_map_color(color)[1],
-            font=(self.font['type'], self.piece_size))
-
     def castling_context(self, e, n):
         # castling 1. check: only Rooks respond to right click
         if 'T' in self.c_chess.gettags(self.c_chess.find_withtag(f'piece_{n}')):
-            print('castling requested with rook_' + str(n))
-            print('These (rook and) king moved so far:')
-            print(self.these_rook_king_moved)
-            print('This rook moved:')
-            print(n in self.these_rook_king_moved)
+            print('castling requested with: rook_' + str(n))
             self.king_position = None
             for i in self.chess_board_keys:
                 if self.chess_board[i] == self.current_player + '+':
                     self.king_position = i
-            print("current player king position " + self.king_position)
-            print('This king moved:')
+            print("current player king position: " + self.king_position)
+            print('These (rook and) king moved so far: ' + str(self.these_rook_king_moved))
+            print('This rook moved: ', end='')
+            print(n in self.these_rook_king_moved)
+            print('This king moved: ', end='')
             print(self.king_position in self.these_rook_king_moved)
             self.castling_rook = n
             # castling 2. check: menu appears only if selected Rook and current player King hasn't moved so far
@@ -495,19 +533,16 @@ class Chess:
             self.c_chess.coords(modify_rook_king(0)[1],  # setting color back together with return id
                                 self.get_square_center(k_col + get_row_col(color, k_col)[0]))
             self.c_chess.itemconfigure(self.c_chess.find_withtag(f'piece_{self.castling_rook}'),
-                                       tag=('piece',
-                                            color,
+                                       tag=('piece', color,
                                             'piece_' + get_row_col(color, k_col)[1] + get_row_col(color, k_col)[0],
                                        'T'))  # update tag of piece
             self.c_chess.itemconfigure(self.c_chess.find_withtag(f'piece_{self.king_position}'),
-                                       tag=('piece',
-                                            color,
+                                       tag=('piece', color,
                                             'piece_' + k_col + get_row_col(color, k_col)[0]))
 
         # castling 3. check: castling dialog only appears if squares empty between king and chosen rook
         if not empty_space_between_king_rook():
-            tk.messagebox.showwarning(title='Castling',
-                                      message='Piece present between king and chosen rook!')
+            tk.messagebox.showwarning(title='Castling', message='Piece present between king and chosen rook!')
         else:
             modify_rook_king(1)
             if self.castling_rook[0] == 'h':
@@ -516,15 +551,14 @@ class Chess:
             else:
                 message = 'Proceed with queenside castling?'
                 side = 'c'
-            do_castling = tk.messagebox.askyesno(title='Castling', message=message, detail='-reserved-')
+            do_castling = tk.messagebox.askyesno(title='Castling', message=message)
             if do_castling:
                 # castling 4. check: castling happens only if king not in check during castling
                 if not king_castling_safe():
-                    tk.messagebox.showwarning(title='Castling',
-                                              message='King in check during castling!')
+                    tk.messagebox.showwarning(title='Illegal move', message='King in check during castling!')
                     modify_rook_king(0)
                 else:
-                    print('castling with rook_' + self.castling_rook)
+                    print('castling with: rook_' + self.castling_rook)
                     backend_castling(self.current_player, side)
                     gui_castling(self.current_player, side)
                     self.currently_selected.set('exit')     # to bypass anticipated position1 and flip player
@@ -542,11 +576,10 @@ class Chess:
                 text=self.txt_map_piece(self.chess_board[self.en_pass_pos[1]][1]))
             # get id of captured piece
             captured_piece = self.c_chess.find_withtag(f'piece_{self.en_pass_pos[1]}')
-            print('captured id=' + str(captured_piece))
+            print('En passant! captured id=' + str(captured_piece))
             # delete captured piece from chess board
             self.c_chess.delete(captured_piece)
             self.chess_board[self.en_pass_pos[1]] = '  '
-            print('En passant!')
         if x == 'w':
             if self.chess_board[self.position1][1] == 'i' and self.position2[1] == '4':
                 self.en_pass_pos[0] = self.position2[0] + str(3)
@@ -594,8 +627,8 @@ class Chess:
                 color_number = 0
             for i in valid_position2s:
                 self.c_chess.itemconfigure('square_' + i, state=tk.NORMAL, fill=self.pos_map_color(i)[color_number])
-            print('waiting for position2')
 
+            print('waiting for position2')
             # in this timeframe there's possibility to reset selection
             self.c_chess.wait_variable(self.currently_selected)
 
@@ -616,10 +649,9 @@ class Chess:
                             text=self.txt_map_piece(self.chess_board[self.position2][1]))
                         # get id of captured piece
                         captured_piece = self.c_chess.find_withtag(f'piece_{self.position2}')
-                        print('captured id=' + str(captured_piece))
+                        print('Capture! captured id=' + str(captured_piece))
                         # delete captured piece from chess board
                         self.c_chess.delete(captured_piece)
-                        print('Capture!')
 
                     # register first move of rook and king for castling
                     if self.chess_board[self.position1][1] == '+' or self.chess_board[self.position1][1] == 'T':
@@ -663,6 +695,10 @@ class Chess:
             elif self.current_player == 'b':
                 self.current_player = 'w'
                 self.other_player = 'b'
+            if self.current_player2 == 'man':
+                self.current_player2 = 'computer'
+            elif self.current_player2 == 'computer':  # comment out these lines to make computer play only
+                self.current_player2 = 'man'  # comment out these lines to make computer play only
         else:
             print('reset or check condition, not flipping player')
 

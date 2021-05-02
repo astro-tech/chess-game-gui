@@ -99,4 +99,5 @@ current_player=w
 current_player2=man
 other_player=b
 these_rook_king_moved=
-en_pass_pos=  ,
+en_pass_pos=  ,  
+number_of_player=1
