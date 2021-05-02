@@ -38,19 +38,48 @@ class Chess:
         self.font_size = int(self.square_size / 3.5)  # 20 for 1366x768
         self.font_color = 'black'
         self.font_type = 'TKDefaultFont'
-        # chess backend variables
+
+        self.currently_selected = tk.StringVar()
+        self.start_new_game = True
+
+        while self.start_new_game:
+            self.play_game()
+
+    def play_game(self):
+        self.clear_previous_session()
+        self.load_board_setup('initial_setup.txt')
+        self.draw_menu()
+        self.draw_4_main_canvas()
+        self.draw_chess_board()
+        self.draw_captured()
+        self.draw_captured_pieces()
+        self.draw_squares()
+        self.initialize_pieces()  # draw included
+        self.display_board()  # legacy backend in terminal
+        self.play_dual()
+        self.ask_for_new_game()
+
+    def play_dual(self):
+        while self.game_still_going:
+            self.handle_turn(self.current_player)
+            self.flip_player()
+            self.check_if_game_still_going()
+
+    def clear_previous_session(self):
         self.chess_board = {}
         self.captured_pieces = {}
         self.current_player = None
         self.other_player = None
-        self.currently_selected = tk.StringVar()
         self.selected_piece = None
         self.position1 = '  '
         self.position2 = '  '
         self.game_still_going = True
         self.winner = None
+        self.start_new_game = True
 
-        self.play_game()
+        for i in self.master.winfo_children():
+            print('destroying' + str(i))
+            i.destroy()
 
     def display_board(self):  # legacy backend for development purposes
         print('-----------------------------------------------')
@@ -88,25 +117,6 @@ class Chess:
                 print(self.captured_pieces['w'][i])
         print('-----------------------------------------------')
 
-    def play_game(self):
-        self.load_board_setup('initial_setup.txt')
-        self.draw_menu()
-        self.draw_4_main_canvas()
-        self.draw_chess_board()
-        self.draw_captured()
-        self.draw_captured_pieces()
-        self.draw_squares()
-        self.initialize_pieces()  # draw included
-        self.display_board()
-        self.play_dual()
-        self.ask_for_new_game()
-
-    def play_dual(self):
-        while self.game_still_going:
-            self.handle_turn(self.current_player)
-            self.flip_player()
-            self.check_if_game_still_going()
-
     def load_board_setup(self, filename):
         file = open(filename, 'r')
         data = file.read().splitlines()
@@ -139,16 +149,24 @@ class Chess:
         self.options_menu = tk.Menu(self.chess_menu)
         self.chess_menu.add_cascade(label='File', menu=self.file_menu, underline=0)
         self.chess_menu.add_cascade(label='Options', menu=self.options_menu, underline=0)
-        self.file_menu.add_command(label='New Game')
+        self.file_menu.add_command(label='New Game', command=self.new_game)
         self.file_menu.add_command(label='Load Game')
         self.file_menu.add_command(label='Save Game')
         self.file_menu.add_separator()
         self.file_menu.add_command(label='Exit', command=self.exit_game)
         self.options_menu.add_command(label='Board size')
 
+    def new_game(self):
+        new_response = tk.messagebox.askyesno(title='New game', message='Do you want to start new game?')
+        if new_response:
+            self.game_still_going = False
+            self.currently_selected.set('exit')
+            print('Setting up new game')
+
     def exit_game(self):
         exit_response = tk.messagebox.askyesno(title='Quit game', message='Do you want to exit game?')
         if exit_response:
+            self.start_new_game = False
             self.game_still_going = False
             self.currently_selected.set('exit')
             print('Exiting chess')
@@ -342,7 +360,7 @@ class Chess:
         self.c_chess.itemconfigure(x, state=tk.NORMAL)
         print('waiting for position1')
         self.c_chess.wait_variable(self.currently_selected)
-        if self.currently_selected.get() != 'exit':
+        if self.currently_selected.get() != 'exit':  # if user didn't close program meanwhile
             self.position1 = self.currently_selected.get()
             print('position1=' + self.position1)
             self.selected_piece = self.c_chess.find_withtag(f'piece_{self.position1}')  # get id of selected piece
@@ -801,7 +819,10 @@ class Chess:
             start_new_game = tk.messagebox.askyesno(title='End of game', message=message, detail='Start new game?')
             if not start_new_game:
                 print('Exiting chess')
+                self.start_new_game = False
                 self.master.destroy()
+            else:
+                print('Setting up new game')
 
 
 if __name__ == '__main__':
