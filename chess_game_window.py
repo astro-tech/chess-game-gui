@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import random
+import operator
 
 
 def char_range(c1, c2):  # stackoverflow.com/questions/7001144/range-over-character-in-python
@@ -717,15 +718,15 @@ class Chess:
                 [piece for i in range(10, 0, -1) for piece in val_assign_piece_dgr if i == val_assign_piece_dgr[piece]]
             return ranked_piece_dgr
 
-        def attack_worth(scenario):
-            if self.chess_board[self.position1][1] == 'i' and self.chess_board[self.position2][1] == 'i':
-                return True
-            elif len(self.piece_dgr[scenario]) == 1:
-                if values[self.chess_board[self.position1][1]] < values[self.chess_board[self.position2][1]]:
+        def attack_worth(dictionary, comp):
+            ops = {'>': operator.gt, '<': operator.lt, '>=': operator.ge, '<=': operator.le}
+            if len(self.piece_dgr[dictionary]) == 1:
+                if ops[comp](values[self.chess_board[self.position1][1]],
+                             values[self.chess_board[self.position2][1]]):
                     return True
             else:
-                if values[self.chess_board[self.position1][1]] < \
-                        values[self.piece_dgr[scenario][rank_piece_dgr(self.piece_dgr[scenario])[0]][1]]:
+                if ops[comp](values[self.chess_board[self.position1][1]],
+                             values[self.piece_dgr[dictionary][rank_piece_dgr(self.piece_dgr[dictionary])[0]][1]]):
                     return True
             return False
 
@@ -762,9 +763,9 @@ class Chess:
             # if not found, it tries to capture the attacker on a non-safe place if attack worth (2nd)
             if not strategy_found:
                 for self.position1 in curr_player_pos:
-                    if self.check_legal_move() and not self.virtual_move_results_check(x) and attack_worth('cur'):
+                    if self.check_legal_move() and not self.virtual_move_results_check(x) and attack_worth('cur', '<'):
                         strategy_found = True
-                        strategy = '2: Defense attack to non-safe place if worth it'
+                        strategy = '2: Defense attack to non-safe place if worth it (loosing lower value piece)'
                         break
             # if not found, it tries to retreat from the threatened coordinate (it checks virtual movement as well
             # due to possible blocking of attacker on current position) so that the sum of values of pieces in danger
@@ -780,14 +781,23 @@ class Chess:
                         strategy_found = True
                         strategy = '3: Retreating to safe place'
                         break
-        # if not under attack or move not found, it tries to attack to a safe place (4th)
+            # if not found, it tries once more to capture the attacker on a non-safe place if attack worth,
+            # but this time losing a same value piece is accepted (4th)
+            if not strategy_found:
+                self.position2 = self.coord_danger_from(rank_piece_dgr(self.piece_dgr['cur'])[0], self.chess_board, x)
+                for self.position1 in curr_player_pos:
+                    if self.check_legal_move() and not self.virtual_move_results_check(x) and attack_worth('cur', '<='):
+                        strategy_found = True
+                        strategy = '4: Defense attack to non-safe place if worth it (loosing same value piece)'
+                        break
+        # if not under attack or move not found, it tries to attack to a safe place (5th)
         if not strategy_found:
             oth_player_pos = [i for i in self.chess_board_keys if self.chess_board[i][0] == self.other_player]
             print("Opponent's pieces standing on: " + str(oth_player_pos))
             self.piece_dgr['oth'] = {i: self.chess_board[i] for i in oth_player_pos if
                                      self.coord_danger_from(i, self.chess_board, self.other_player)}
             print("Opponent's pieces under attack: " + str(self.piece_dgr['oth']))
-            if self.piece_dgr['oth']:  # attack strategies 4, 5
+            if self.piece_dgr['oth']:  # attack strategies 5, 6
                 # iterates positions of other player's pieces in danger and selects the current piece which attacks it
                 for oth_pos in rank_piece_dgr(self.piece_dgr['oth']):
                     self.position1 = self.coord_danger_from(oth_pos, self.chess_board, self.other_player)
@@ -796,22 +806,23 @@ class Chess:
                     if self.check_legal_move() and not self.virtual_move_results_check(x) and \
                             not self.coord_danger_from(self.position2, self.chess_board, x):
                         strategy_found = True
-                        strategy = '4: Attack to safe place'
+                        strategy = '5: Attack to safe place'
                         break
-                    # if not managed, it still tries the attack if it worth (5th)
-                    elif self.check_legal_move() and not self.virtual_move_results_check(x) and attack_worth('oth'):
+                    # if not managed, it still tries the attack if it worth (6th)
+                    elif self.check_legal_move() and not self.virtual_move_results_check(x) and \
+                            attack_worth('oth', '<'):
                         strategy_found = True
-                        strategy = '5: Attack to non-safe place if worth it'
+                        strategy = '6: Attack to non-safe place if worth it'
                         break
-        # if not under attack or move not found, it tries the en passant capture (6th)
+        # if not under attack or move not found, it tries the en passant capture (7th)
         if not strategy_found and self.en_pass_pos[0] != '  ':
             self.position1 = self.coord_danger_from(self.en_pass_pos[0], self.chess_board, self.other_player)
             if self.position1:
                 self.position2 = self.en_pass_pos[0]
                 strategy_found = True
-                strategy = '6: Attack with En passant'
+                strategy = '7: Attack with En passant'
         # if not under attack or previous moves not found, it tries to move to safe place towards opponent's king
-        # so that the sum of values of pieces in danger don't increase (7th)
+        # so that the sum of values of pieces in danger don't increase (8th)
         if not strategy_found:
             safe_position2s = [i for i in self.chess_board_keys if not self.coord_danger_from(i, self.chess_board, x)
                                and self.chess_board[i] not in [x + 'T', x + 'f', x + 'A', x + '+', x + '*', x + 'i']]
@@ -827,12 +838,12 @@ class Chess:
                     if self.check_legal_move() and not self.virtual_move_results_check(x) and \
                             piece_dgr_values_check(self.chess_board, self.chess_board_virtual):
                         strategy_found = True
-                        strategy = '7: Move to safe place'
+                        strategy = '8: Move to safe place'
                         break
                 else:
                     continue
                 break
-        # if previous strategies failed, it tries any legal move (8th)
+        # if previous strategies failed, it tries any legal move (9th)
         if not strategy_found:
             randomized_curr_player_pos = random.sample(curr_player_pos, len(curr_player_pos))
             randomized_chess_board_keys = random.sample(self.chess_board_keys, len(self.chess_board_keys))
@@ -840,7 +851,7 @@ class Chess:
                 for self.position2 in randomized_chess_board_keys:
                     if self.chess_board[self.position2] not in [x + 'T', x + 'f', x + 'A', x + '+', x + '*', x + 'i'] \
                             and self.check_legal_move() and not self.virtual_move_results_check(x):
-                        strategy = '8: Make any legal move'
+                        strategy = '9: Make any legal move'
                         break
                 else:
                     continue
