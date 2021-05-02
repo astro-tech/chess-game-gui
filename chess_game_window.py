@@ -2,15 +2,25 @@ import tkinter as tk
 from tkinter import ttk
 
 
+# from https://stackoverflow.com/questions/7001144/range-over-character-in-python
+# range function for letters
+def char_range(c1, c2):
+    """Generates the characters from `c1` to `c2`, inclusive."""
+    for c in range(ord(c1), ord(c2) + 1):
+        yield chr(c)
+
+
 class Chess:
     def __init__(self, master):
         self.master = master
         self.master.title('Chess Game')
-        self.screen_size = (1366, 768)
+        self.screen_size = (1024, 576)  # other (1024, 576)(1366, 768)(1920, 1080)
         self.square_size = int(self.screen_size[1] / 10.97)  # 70 for 1366x768
         self.canvas_widgets_color = 'grey75'
         self.dark_squares_color = 'grey25'
         self.light_squares_color = 'grey95'
+        self.dark_squares_highlight = '#800000'
+        self.light_squares_highlight = '#ffc8c8'
         self.color_abc = 'grey50'
         self.color_123 = 'grey55'
         self.master.minsize(self.screen_size[0] - 2, self.screen_size[1] - 92)  # 2blue edge,50bar and menu,40tray=92
@@ -55,7 +65,7 @@ class Chess:
 
     def create_chess_board(self):
         self.c_chess = tk.Canvas(self.c_board, width=self.square_size * 8, height=self.square_size * 8,
-                                 bg=self.dark_squares_color)
+                                 bg=self.canvas_widgets_color)
         self.board_abc_n = tk.Canvas(self.c_board, width=self.square_size * 8,
                                      height=(self.c_board_size - self.square_size * 8) / 2, bg=self.color_abc)
         self.board_abc_s = tk.Canvas(self.c_board, width=self.square_size * 8,
@@ -72,46 +82,26 @@ class Chess:
         self.board_abc_s.grid(column=1, row=2)
         self.board_123_e.grid(column=2, row=0, rowspan=3)
 
-        """This code generates the white squares over the grey canvas. This requires a list consisting of
-        32 items, each consisting of 4 items, reprensenting the coordinates to create each rectange(x0, y0, x1, y1).
-        To generate this list, it was neccessary to split it into two lists (coordinates leading each row,
-        coordinates following this to fill the row. To generate the leading coordinates the initial lead_coords
-        is given (the top left rectangle's coordinates). Then it is divided if the row number (0-7) is odd or
-        even. For odd rows we always add the increment, fo even rows we alternate subtraction and addition.
-        (-, +, -, +). Once we have the leading rectangles's coordinates, we do a nested loop to generate the
-        remaining 3 coordinates in each row. This is the follow_coords = [] (initially empty). The outer loop
-        generates the row number (0-7), and the inner loop generates the 3 required increments. Finally the
-        lead and follow lists are added together and the full list whites_coords can be used. It is destructured
-        with *i when each rectangle coordinate is needed.      
-        """
-
-        #  initially in a list of 1 element consisting of 4 numbers
-        self.lead_coords = [[0, 0, self.square_size, self.square_size]]
-        for i in range(1, 8):
-            if i % 2 == 1:
-                self.lead_coords.append([self.lead_coords[i - 1][0] + self.square_size,
-                                         self.lead_coords[i - 1][1] + self.square_size,
-                                         self.lead_coords[i - 1][2] + self.square_size,
-                                         self.lead_coords[i - 1][3] + self.square_size])
-            elif i % 2 == 0:
-                self.lead_coords.append([self.lead_coords[i - 1][0] - self.square_size,
-                                         self.lead_coords[i - 1][1] + self.square_size,
-                                         self.lead_coords[i - 1][2] - self.square_size,
-                                         self.lead_coords[i - 1][3] + self.square_size])
-        self.follow_coords = []
-        for i in range(0, 8):
-            for j in [self.square_size*2, self.square_size*4, self.square_size*6]:
-                self.follow_coords.append([self.lead_coords[i][0] + j, self.lead_coords[i][1],
-                                           self.lead_coords[i][2] + j, self.lead_coords[i][3]])
-        self.whites_coords = self.lead_coords + self.follow_coords
-        for i in self.whites_coords:
-            self.c_chess.create_rectangle(*i, fill=self.light_squares_color, width=0, activefill='#ffc8c8',
-                                          tag='checker')
-
-        self.c_chess.addtag('a8', 'withtag', 1)
-        self.c_chess.tag_bind('a8', '<Button-1>', lambda e: print('a8'))
-        self.c_chess.itemconfigure('checker', state=tk.DISABLED)
-        self.master.after(5000, lambda: self.c_chess.itemconfigure('checker', state=tk.NORMAL))
+        # create_squares
+        self.chess_keys = []
+        for number in range(8, 0, -1):
+            for letter in char_range('a', 'h'):
+                self.chess_keys.append(letter + str(number))
+        for i in self.chess_keys:
+            x0 = (ord(i[0]) - 97) * self.square_size
+            y0 = abs(int(i[1]) - 8) * self.square_size
+            x1 = (ord(i[0]) - 96) * self.square_size
+            y1 = abs(int(i[1]) - 9) * self.square_size
+            if (ord(i[0]) + int(i[1])) % 2 == 0:    # True if dark square, False if light square
+                color = self.dark_squares_color
+                act_color = self.dark_squares_highlight
+            else:
+                color = self.light_squares_color
+                act_color = self.light_squares_highlight
+            self.c_chess.create_rectangle(x0, y0, x1, y1, fill=color, width=0,
+                                          activefill=act_color, tag=('square', i))
+            # e not used but always created as event, so a new kw parameter n is created which is local to lambda
+            self.c_chess.tag_bind(i, '<Button-1>', lambda e, n=i: print(n))
 
 
 
