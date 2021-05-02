@@ -62,6 +62,7 @@ class Chess:
         self.castling_rook = None  # tempo info holder for castling
         self.king_position = None  # tempo info holder for castling
         self.piece_dgr = {}
+        self.previous_12_board = {}
         self.game_is_saved = False
         self.game_speed = 1000
 
@@ -98,6 +99,7 @@ class Chess:
         self.game_still_going = True
         self.winner = None
         self.position1 = None   # this indicates first turn, see handle turn initialize select piece
+        self.previous_12_board = {str(i) + 'ago': {} for i in range(1, 13)}
         for widget in self.master.winfo_children():
             print('destroying' + str(widget))
             widget.destroy()
@@ -1210,6 +1212,13 @@ class Chess:
             elif {'w+', 'b+', 'wA', 'bA'} == set(all_player_pos) and \
                     self.pos_map_color(all_player_pos['wA']) == self.pos_map_color(all_player_pos['bA']):
                 self.game_still_going = False  # only king+bishop - king+bishop left, with bishops on same color
+            if self.chess_board == self.previous_12_board['4ago'] and \
+                    self.chess_board == self.previous_12_board['8ago'] and \
+                    self.chess_board == self.previous_12_board['12ago']:
+                self.game_still_going = False   # the same board repeated for 3x times
+            for a, b in list(zip([i for i in range(12, 1, -1)], [i for i in range(11, 0, -1)])):    # (12, 11) to (2, 1)
+                self.previous_12_board[str(a) + 'ago'] = self.previous_12_board[str(b) + 'ago'].copy()
+            self.previous_12_board['1ago'] = self.chess_board.copy()
 
     def legal_move_possible(self, x):
         current_player_positions = [i for i in self.chess_board_keys if self.chess_board[i][0] == x]
