@@ -413,26 +413,53 @@ class Chess:
                 self.castling_menu.post(e.x_root, e.y_root)
 
     def castling(self):
-        print('castling with rook_' + self.castling_rook)
-
-        def highlight_rook_king(color):
+        def modify_rook_king(color):
             rook_id = self.c_chess.find_withtag(f'piece_{self.castling_rook}')
             self.c_chess.itemconfigure(rook_id, fill=self.txt_map_color(self.current_player)[color])
             king_id = self.c_chess.find_withtag(f'piece_{self.king_position}')
             self.c_chess.itemconfigure(king_id, fill=self.txt_map_color(self.current_player)[color])
-        highlight_rook_king(1)
+            return rook_id, king_id  # also extracts object id
+
+        def get_row_col(color, k_col):
+            if color == 'w':
+                row = str(1)
+            else:
+                row = str(8)
+            if k_col == 'g':
+                r_col = 'f'
+            else:
+                r_col = 'd'
+            return row, r_col
+
+        def backend_castling(color, k_col):
+            self.chess_board[k_col + get_row_col(color, k_col)[0]] = color + '+'
+            self.chess_board[self.king_position] = '  '
+            self.chess_board[get_row_col(color, k_col)[1] + get_row_col(color, k_col)[0]] = color + 'T'
+            self.chess_board[self.castling_rook] = '  '
+
+        def gui_castling(color, k_col):
+            self.c_chess.coords(modify_rook_king(0)[0],  # setting color back together with return id
+                                self.get_square_center(get_row_col(color, k_col)[1] + get_row_col(color, k_col)[0]))
+            self.c_chess.coords(modify_rook_king(0)[1],  # setting color back together with return id
+                                self.get_square_center(k_col + get_row_col(color, k_col)[0]))
+
+        modify_rook_king(1)
+        print('castling with rook_' + self.castling_rook)
 
         if self.castling_rook[0] == 'h':
             message = 'Proceed with kingside castling?'
+            side = 'g'
         else:
             message = 'Proceed with queenside castling?'
+            side = 'c'
         do_castling = tk.messagebox.askyesno(title='Castling', message=message, detail='-reserved-')
         if do_castling:
-            print('proceeding with castling')       # todo castling
-            highlight_rook_king(0)
-            self.currently_selected.set('exit')     # to bypass anticipated position1 and flip player
+            backend_castling(self.current_player, side)
+            gui_castling(self.current_player, side)
+            self.currently_selected.set('exit')  # to bypass anticipated position1 and flip player
+            self.display_board()
         else:
-            highlight_rook_king(0)
+            modify_rook_king(0)
 
     def handle_turn(self, x):
         self.selected_piece = None
