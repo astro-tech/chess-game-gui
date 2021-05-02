@@ -1105,28 +1105,28 @@ class Chess:
     # checks if xn coordinate of x player on board is under attack from enemy and returns enemy's coordinates
     def coord_danger_from(self, xn, board, x):
         queen_rook = self.coord_danger_from_queen_rook_bishop(
-            xn, board, x, [('z', 1, 0, -1), ('z', 8, 0, 1), ('h', 9, 1, 0), ('a', 9, -1, 0)], ('T', '*'))
+            xn, board, x, [('z', 1, 0, -1), ('z', 8, 0, 1), ('h', 9, 1, 0), ('a', 9, -1, 0)], ('*', 'T'))
         # check_param order: from xn checking down, up, right, left
-        queen_bishop = self.coord_danger_from_queen_rook_bishop(
-            xn, board, x, [('h', 1, 1, -1), ('h', 8, 1, 1), ('a', 8, -1, 1), ('a', 1, -1, -1)], ('A', '*'))
-        # check_param order: from xn checking right down, right up, left up, left down
-        king = self.coord_danger_from_king_knight(xn, board, x, [(-1, -1), (0, -1), (1, -1), (-1, 0),
-                                                                 (1, 0), (-1, 1), (0, 1), (1, 1)], '+')
-        knight = self.coord_danger_from_king_knight(xn, board, x, [(1, -2), (2, -1), (2, 1), (1, 2),
-                                                                   (-1, 2), (-2, 1), (-2, -1), (-1, -2)], 'f')
-        white_pawn = self.coord_danger_from_pawn(xn, board, [(-1, -1), (1, -1)], 'w')
-        black_pawn = self.coord_danger_from_pawn(xn, board, [(-1, 1), (1, 1)], 'b')
         if queen_rook:
             return queen_rook
-        elif queen_bishop:
+        queen_bishop = self.coord_danger_from_queen_rook_bishop(
+            xn, board, x, [('h', 1, 1, -1), ('h', 8, 1, 1), ('a', 8, -1, 1), ('a', 1, -1, -1)], ('*', 'A'))
+        # check_param order: from xn checking right down, right up, left up, left down
+        if queen_bishop:
             return queen_bishop
-        elif king:
+        king = self.coord_danger_from_king_knight(xn, board, x, [(-1, -1), (0, -1), (1, -1), (-1, 0),
+                                                                 (1, 0), (-1, 1), (0, 1), (1, 1)], '+')
+        if king:
             return king
-        elif knight:
+        knight = self.coord_danger_from_king_knight(xn, board, x, [(1, -2), (2, -1), (2, 1), (1, 2),
+                                                                   (-1, 2), (-2, 1), (-2, -1), (-1, -2)], 'f')
+        if knight:
             return knight
-        elif white_pawn and x == 'b':
+        white_pawn = self.coord_danger_from_pawn(xn, board, [(-1, -1), (1, -1)], 'w')
+        if white_pawn and x == 'b':
             return white_pawn
-        elif black_pawn and x == 'w':
+        black_pawn = self.coord_danger_from_pawn(xn, board, [(-1, 1), (1, 1)], 'b')
+        if black_pawn and x == 'w':
             return black_pawn
 
     def coord_danger_from_queen_rook_bishop(self, xn, board, x, check_param, pieces):
@@ -1147,14 +1147,17 @@ class Chess:
         threat_coordinates = []
         for k in range(len(check_param)):
             hor_vrt_dia_check(*check_param[k])
-        if x == 'w':
-            for i in threat_coordinates:
-                if board[i] == 'b' + pieces[0] or board[i] == 'b' + pieces[1]:
-                    return i
-        elif x == 'b':
-            for i in threat_coordinates:
-                if board[i] == 'w' + pieces[0] or board[i] == 'w' + pieces[1]:
-                    return i
+        attacker = None
+        for cur, oth in [('w', 'b'), ('b', 'w')]:
+            if x == cur:
+                for i in threat_coordinates:
+                    if board[i] == oth + pieces[0]:
+                        attacker = i
+                if not attacker:
+                    for i in threat_coordinates:
+                        if board[i] == oth + pieces[1]:
+                            attacker = i
+        return attacker
 
     def coord_danger_from_king_knight(self, xn, board, x, xy, piece):
         possible_coordinates = [chr(ord(xn[0]) + a) + str(int(xn[1]) + b) for a, b in xy]
