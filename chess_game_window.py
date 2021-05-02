@@ -63,6 +63,8 @@ class Chess:
     def play_dual(self):
         while self.game_still_going:
             self.handle_turn(self.current_player)
+            if self.promotion_coordinate(self.current_player):
+                self.ask_promotion(self.current_player)
             self.flip_player()
             self.check_if_game_still_going()
 
@@ -133,6 +135,7 @@ class Chess:
             for line in data[81:97]:
                 value = line.split('=')[1]
                 self.captured_pieces['b'].append(value)  # importing captures black pieces data
+            # print(self.captured_pieces)
             current_player_line = data[97]
             current_player_value = current_player_line.split('=')[1]
             self.current_player = current_player_value
@@ -141,14 +144,13 @@ class Chess:
             self.other_player = other_player_value
             file.close()
             self.chess_board_keys = list(self.chess_board.keys())
-            # print(self.captured_pieces)
         except FileNotFoundError as error:
             print(error)
             tk.messagebox.showerror(title='Error', message='initial_setup.txt is missing from game directory!')
             self.master.destroy()
         except IndexError:
-            self.captured_pieces = self.captured_pieces2
-            self.chess_board = self.chess_board2
+            self.chess_board = self.chess_board2.copy()
+            self.captured_pieces = self.captured_pieces2.copy()
             self.current_player = self.current_player2
             self.other_player = self.other_player2
             print('Wrong file opened!')
@@ -371,6 +373,7 @@ class Chess:
             font=(self.font_type, self.piece_size))
 
     def handle_turn(self, x):
+        self.selected_piece = None
         # for i in range(1, 97):
         #     print(i, end=' ')
         #     print(self.c_chess.gettags(i))
@@ -430,7 +433,6 @@ class Chess:
                     self.c_chess.itemconfigure(self.selected_piece,
                                                tag=('piece', f'piece_{self.position2}', x))  # update tag of piece
                     print('new tags=' + str(self.c_chess.gettags(self.selected_piece)))
-                    self.selected_piece = None
                 else:
                     tk.messagebox.showwarning(title='Illegal move',
                                               message='Movement leaves or places the king in check!')
@@ -445,6 +447,49 @@ class Chess:
             self.currently_selected.set('reset')  # substitute anticipated position2 with a reset flag
         else:
             print('no piece to reset')
+
+    def promotion_coordinate(self, x):
+        if x == 'w':
+            for i in self.chess_board_keys[0: 8]:  # a8-h8
+                if self.chess_board[i] == 'wi':
+                    return i
+        elif x == 'b':
+            for i in self.chess_board_keys[56: 65]:  # a1-h1
+                if self.chess_board[i] == 'bi':
+                    return i
+
+    def ask_promotion(self, x):
+        button_value = tk.StringVar()
+        button_value.set('*')
+        promotion_selected = tk.StringVar()
+
+        promotion_window = tk.Toplevel(self.master)
+        promotion_window.title('Promotion')
+        promotion_window.resizable(False, False)
+
+        promotion_frame = ttk.Frame(promotion_window, padding=10)
+        promotion_frame.grid(column=0, row=0, sticky='n, w, e, s')
+
+        message = ttk.Label(promotion_frame,
+                            text="One of your pawn reached 8th rank.\nChoose a replacement piece from the list:")
+        message.grid(column=0, row=0, columnspan=4, sticky='n, w, s')
+
+        buttons = {}  # creating radio buttons to select pieces
+        for piece, label in [('*', 'Queen (♛)'), ('T', 'Rook (♜)'), ('A', 'Bishop (♝)'), ('f', 'Knight (♞)')]:
+            buttons[piece] = ttk.Radiobutton(promotion_frame, text=label, variable=button_value, value=piece,
+                                             padding=10)
+        for piece, col in [('*', 0), ('T', 1), ('A', 2), ('f', 3)]:
+            buttons[piece].grid(column=col, row=1, sticky='n, w, e, s')
+
+        ok_button = ttk.Button(promotion_frame, text='Select', command=lambda: promotion_selected.set('yes'))
+        ok_button.grid(column=3, row=2, sticky='n, w, e, s')
+
+        root.wait_variable(promotion_selected)
+        promotion_window.destroy()
+
+        self.chess_board[self.promotion_coordinate(x)] = x + button_value.get()  # set backend
+        self.c_chess.itemconfigure(self.selected_piece, text=self.txt_map_piece(button_value.get()))  # set frontend
+        self.display_board()
 
     def flip_player(self):
         if self.currently_selected.get() != 'reset':
