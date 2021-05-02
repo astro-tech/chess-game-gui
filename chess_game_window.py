@@ -10,18 +10,30 @@ def char_range(c1, c2):  # stackoverflow.com/questions/7001144/range-over-charac
         yield chr(c)
 
 
-def measure_dist(pos1, pos2):
-    x_dist = abs(ord(pos2[0]) - ord(pos1[0]))
-    y_dist = abs(int(pos2[1]) - int(pos1[1]))
-    dist = (x_dist ** 2 + y_dist ** 2) ** 0.5
-    return float(round(dist, 1))
+def center(win, x_offset, y_offset):
+    # stackoverflow.com/questions/3352918/how-to-center-a-window-on-the-screen-in-tkinter
+    win.update_idletasks()
+    width = win.winfo_width()
+    frm_width = win.winfo_rootx() - win.winfo_x()
+    win_width = width + 2 * frm_width
+    height = win.winfo_height()
+    title_bar_height = win.winfo_rooty() - win.winfo_y()
+    win_height = height + title_bar_height + frm_width
+    win.geometry(f'+{win.winfo_screenwidth() // 2 - win_width // 2 - x_offset}'
+                 f'+{win.winfo_screenheight() // 2 - win_height // 2 - y_offset}')
 
 
-class Chess:
-    def __init__(self, master):
+class GameWindow:
+    def __init__(self, master, screen_size, file_to_load, from_menu):
         self.master = master
-        self.master.title('Chess Game')
-        self.screen_size = (1024, 576)  # other (1024, 576)(1366, 768)(1920, 1080)
+        self.master.title('GMF Chess')
+        try:
+            self.master.iconphoto(True, tk.PhotoImage(file='./graphics/chess_icon64.png'))  # True=top level inherits it
+        except tk.TclError:
+            print('Game icon file not found')
+        self.screen_size = screen_size  # (1024, 576)(1366, 768)(1920, 1080)
+        self.file_to_load = file_to_load
+        self.menu_initiated_values = from_menu
         # 2 blue edge, 50 bar and menu, 40 tray = 92
         self.master.minsize(self.screen_size[0] - 2, self.screen_size[1] - 92)
         self.master.maxsize(self.screen_size[0] - 2, self.screen_size[1] - 92)
@@ -45,14 +57,13 @@ class Chess:
         self.other_player = None
         self.these_rook_king_moved = []
         self.en_pass_pos = None
-        self.number_of_player = tk.IntVar(value=2)  # game save values end
+        self.number_of_player = None  # game save values end
         self.chess_board_keys = None
         self.chess_board_virtual = None
         self.c_chess = None
         self.currently_selected = tk.StringVar()
         self.show_legal_moves_man = tk.BooleanVar(value=True)
         self.show_legal_moves_computer = tk.BooleanVar(value=False)
-        self.file_to_load = 'initial_setup.txt'
         self.c = {}  # dictionary for gui elements created later and used for multiple methods
         self.bak = {}  # dictionary for backups
         self.position1 = None
@@ -82,18 +93,21 @@ class Chess:
         self.draw_captured_pieces()
         self.draw_squares()
         self.draw_pieces()
+        # center(self.master, 0, 18)
+        self.master.focus_set()
         while self.game_still_going:
-            if (self.number_of_player.get() == 1 and self.current_player2 == 'man') or self.number_of_player.get() == 2:
+            if (self.number_of_player == 1 and self.current_player2 == 'man') or self.number_of_player == 2:
                 self.handle_turn(self.current_player)
                 if self.promotion_coordinate(self.current_player):
                     self.promotion_dialog(self.current_player)
             else:
-                if self.number_of_player.get() == 0:   # to leave time to finish rendering
+                if self.number_of_player == 0:   # to leave time to finish rendering
                     self.master.after(self.game_speed * 3, lambda: self.currently_selected.set('demo'))
                     self.c_chess.wait_variable(self.currently_selected)
-                self.computer_turn(self.current_player)
-                if self.promotion_coordinate(self.current_player):
-                    self.computer_promotion(self.current_player)
+                if self.currently_selected.get() != 'exit':
+                    self.computer_turn(self.current_player)
+                    if self.promotion_coordinate(self.current_player):
+                        self.computer_promotion(self.current_player)
             self.game_is_saved = False
             self.flip_player()
             self.check_if_game_still_going(self.current_player)
@@ -109,6 +123,8 @@ class Chess:
             widget.destroy()
 
     def draw_menu(self):
+        def show_help():
+            messagebox.showinfo(title='Help', message=instructions_text)
         self.master.option_add('*tearOff', False)
         main_menu = tk.Menu(self.master)
         self.master['menu'] = main_menu
@@ -124,7 +140,7 @@ class Chess:
         file_menu.add_separator()
         file_menu.add_command(label='Exit', command=self.exit_game)
         options_menu.add_command(label='Settings', command=self.settings_dialog)
-        help_menu.add_command(label='About')
+        help_menu.add_command(label='About', command=show_help)
 
         self.c['castling_menu'] = tk.Menu(self.master)  # context menu
         self.c['castling_menu'].add_command(label='Castling', command=self.castling)
@@ -134,8 +150,15 @@ class Chess:
     def new_game(self):
         new_response = tk.messagebox.askyesno(title='New game', message='Do you want to start new game?')
         if new_response:
+            if self.number_of_player != 2:  # to leave time to finish rendering
+                self.master.after(self.game_speed * 2, lambda: self.currently_selected.set('demo'))
+                self.c_chess.wait_variable(self.currently_selected)
             self.game_still_going = False
             self.file_to_load = 'initial_setup.txt'
+            self.menu_initiated_values['current_player'] = 'w'  # too keep these preferences
+            self.menu_initiated_values['current_player2'] = 'man'
+            self.menu_initiated_values['other_player'] = 'b'
+            self.menu_initiated_values['number_of_player'] = self.number_of_player
             self.currently_selected.set('exit')
             print('Setting up new game')
 
@@ -172,7 +195,7 @@ class Chess:
             file.write('other_player=' + self.other_player + '\n')
             file.write('these_rook_king_moved=' + ','.join(self.these_rook_king_moved) + '\n')
             file.write('en_pass_pos=' + ','.join(self.en_pass_pos) + '\n')
-            file.write('number_of_player=' + str(self.number_of_player.get()))
+            file.write('number_of_player=' + str(self.number_of_player))
             file.close()
             self.game_is_saved = True
             print('Game is saved')
@@ -201,10 +224,11 @@ class Chess:
     def settings_dialog(self):
         show_legal_moves_man2 = tk.BooleanVar(value=self.show_legal_moves_man.get())
         show_legal_moves_cmp2 = tk.BooleanVar(value=self.show_legal_moves_computer.get())
-        number_of_player2 = tk.IntVar(value=self.number_of_player.get())
+        number_of_player2 = tk.IntVar(value=self.number_of_player)
         settings_selected = tk.BooleanVar()
 
         settings_window = tk.Toplevel(self.master)
+        settings_window.focus_set()
         settings_window.title('Settings')
         settings_window.resizable(False, False)
         settings_window.protocol("WM_DELETE_WINDOW", lambda: settings_selected.set(True))
@@ -231,7 +255,7 @@ class Chess:
         def apply_button_logic():
             self.show_legal_moves_man.set(show_legal_moves_man2.get())
             self.show_legal_moves_computer.set(show_legal_moves_cmp2.get())
-            self.number_of_player.set(number_of_player2.get())
+            self.number_of_player = number_of_player2.get()
             settings_selected.set(True)
 
         apply_button = ttk.Button(settings_frame, text='Apply', command=apply_button_logic)
@@ -256,9 +280,14 @@ class Chess:
             self.these_rook_king_moved = rook_king_moved_string.split(',')
             en_pass_pos_string = data[101].split('=')[1]
             self.en_pass_pos = en_pass_pos_string.split(',')
-            self.number_of_player.set(data[102].split('=')[1])
+            self.number_of_player = int(data[102].split('=')[1])
             file.close()
             self.chess_board_keys = list(self.chess_board.keys())
+            if self.menu_initiated_values and self.file_to_load == 'initial_setup.txt':
+                self.current_player = self.menu_initiated_values['current_player']
+                self.current_player2 = self.menu_initiated_values['current_player2']
+                self.other_player = self.menu_initiated_values['other_player']
+                self.number_of_player = self.menu_initiated_values['number_of_player']
         except FileNotFoundError as error:
             print(error)
             tk.messagebox.showerror(title='Error', message='initial_setup.txt is missing from game directory!')
@@ -446,7 +475,8 @@ class Chess:
         yc = (y0 + y1) / 2
         return xc, yc
 
-    def txt_map_piece(self, txt):
+    @staticmethod
+    def txt_map_piece(txt):
         if txt == 'T':
             return '♜'
         elif txt == 'f':
@@ -635,7 +665,7 @@ class Chess:
             print(f'En passant possible for {self.en_pass_pos[1]}, capture at {self.en_pass_pos[0]}')
 
     def display_next_player(self, x):
-        if self.current_player2 == 'man' and self.number_of_player.get() == 1 and self.position1 and \
+        if self.current_player2 == 'man' and self.number_of_player == 1 and self.position1 and \
                 self.currently_selected.get() != 'reset':
             curr_speed = self.game_speed
         else:
@@ -757,6 +787,12 @@ class Chess:
             # print(player + ',' + str(ops[comp](sum(dgr_values_before), sum(dgr_values_after))))
             return {'r': ops[comp](sum(dgr_values_before), sum(dgr_values_after)),
                     'b': sum(dgr_values_before), 'a': sum(dgr_values_after)}
+
+        def measure_dist(pos1, pos2):
+            x_dist = abs(ord(pos2[0]) - ord(pos1[0]))
+            y_dist = abs(int(pos2[1]) - int(pos1[1]))
+            dist = (x_dist ** 2 + y_dist ** 2) ** 0.5
+            return float(round(dist, 1))
 
         self.display_next_player(x)
         strategy = 'None'
@@ -971,11 +1007,11 @@ class Chess:
             elif self.current_player == 'b':
                 self.current_player = 'w'
                 self.other_player = 'b'
-            if (self.number_of_player.get() == 1 and self.current_player2 == 'man') or \
-                    self.number_of_player.get() == 0:
+            if (self.number_of_player == 1 and self.current_player2 == 'man') or \
+                    self.number_of_player == 0:
                 self.current_player2 = 'computer'
-            elif (self.number_of_player.get() == 1 and self.current_player2 == 'computer') or \
-                    self.number_of_player.get() == 2:
+            elif (self.number_of_player == 1 and self.current_player2 == 'computer') or \
+                    self.number_of_player == 2:
                 self.current_player2 = 'man'
         else:
             print('reset or check condition, not flipping player')
@@ -1004,6 +1040,7 @@ class Chess:
         promotion_selected = tk.BooleanVar()
 
         promotion_window = tk.Toplevel(self.master)
+        promotion_window.focus_set()
         promotion_window.title('Promotion')
         promotion_window.resizable(False, False)
         promotion_window.protocol("WM_DELETE_WINDOW", lambda: promotion_selected.set(True))
@@ -1163,7 +1200,8 @@ class Chess:
         if black_pawn and x == 'w':
             return black_pawn
 
-    def coord_danger_from_queen_rook_bishop(self, xn, board, x, check_param, pieces):
+    @staticmethod
+    def coord_danger_from_queen_rook_bishop(xn, board, x, check_param, pieces):
 
         def hor_vrt_dia_check(limit_col, limit_row, dct_c, dct_r):  # universal horizontal, vertical, diagonal
             if xn[0] != limit_col and int(xn[1]) != limit_row:
@@ -1288,7 +1326,20 @@ class Chess:
                 self.file_to_load = 'initial_setup.txt'
 
 
+instructions_text = """Instructions:\n
+To start the game, select from the 3 available window sizes below. If you select Load Game, the previously selected \
+number of player preference is also loaded. With selecting the New Game option you have to chose between man-computer \
+or man-man modes. Selecting the first one also prompts to chose the man's piece color. The single/dual player mode can \
+be changed during gameplay, always taking effect from the next turn.\nTo select a piece, click on it with left mouse \
+button, to deselect it, right click or hit Esc. For castling, right click on the rook which will be involved in \
+castling. Note that castling will not be offered if the selected rook or it's king moved already.\nThe game supports \
+special moves like en-passant or pawn promotion. If one of the pawn reaches 8th rank, an option will be offered to \
+replace it.\nAt any time during the game you can access New/Load/Save Game from File Menu.\nThe Options/Settings \
+Menu let's you to change number of player and if the legal move squares to be highlighted or not.\nDuring gameplay \
+there can be warning messages in case the king is left in check.\nAt the end the winner color or draw is displayed \
+and a new game is offered.\nIt's time to Get More Freedom!\nCopyright by Csaba Bai ©2020-2021"""
+
 if __name__ == '__main__':
     root = tk.Tk()
-    Chess(root)
+    GameWindow(root, (1024, 576), 'initial_setup.txt', {})
     # root.mainloop()
