@@ -96,5 +96,7 @@ b13=
 b14=  
 b15=  
 current_player=w
+current_player2=man
 other_player=b
 these_rook_king_moved=
+en_pass_pos=  ,

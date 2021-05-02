@@ -32,10 +32,13 @@ class Chess:
         self.chess_board = {}
         self.captured_pieces = {}
         self.current_player = None
+        self.current_player2 = None
         self.other_player = None
         self.these_rook_king_moved = []
+        self.en_pass_pos = None
         self.currently_selected = tk.StringVar()
         self.show_legal_moves = tk.BooleanVar(value=True)
+        self.number_of_player = tk.IntVar(value=2)
         self.file_to_load = 'initial_setup.txt'
         self.position1 = None
         self.position2 = None
@@ -60,16 +63,14 @@ class Chess:
         self.draw_squares()
         self.initialize_pieces()  # draw included
         self.display_board()  # legacy backend in terminal
-        self.play_dual()
-        self.ask_for_new_game()
-
-    def play_dual(self):
         while self.game_still_going:
-            self.handle_turn(self.current_player)
-            if self.promotion_coordinate(self.current_player):
-                self.promotion_dialog(self.current_player)
+            if (self.number_of_player.get() == 1 and self.current_player2 == 'man') or self.number_of_player.get() == 2:
+                self.handle_turn(self.current_player)
+                if self.promotion_coordinate(self.current_player):
+                    self.promotion_dialog(self.current_player)
             self.flip_player()
             self.check_if_game_still_going(self.current_player)
+        self.ask_for_new_game()
 
     def clear_previous_session(self):
         self.game_still_going = True
@@ -131,16 +132,13 @@ class Chess:
                 value = line.split('=')[1]
                 self.captured_pieces['b'].append(value)  # importing captures black pieces data
             # print(self.captured_pieces)
-            current_player_line = data[97]
-            current_player_value = current_player_line.split('=')[1]
-            self.current_player = current_player_value
-            other_player_line = data[98]
-            other_player_value = other_player_line.split('=')[1]
-            self.other_player = other_player_value
-            # print(self.current_player + ', ' + self.other_player)
-            rook_king_moved_line = data[99]
-            rook_king_moved_string = rook_king_moved_line.split('=')[1]
+            self.current_player = data[97].split('=')[1]
+            self.current_player2 = data[98].split('=')[1]
+            self.other_player = data[99].split('=')[1]
+            rook_king_moved_string = data[100].split('=')[1]
             self.these_rook_king_moved = rook_king_moved_string.split(',')
+            en_pass_pos_string = data[101].split('=')[1]
+            self.en_pass_pos = en_pass_pos_string.split(',')
             file.close()
             self.chess_board_keys = list(self.chess_board.keys())
         except FileNotFoundError as error:
@@ -534,6 +532,36 @@ class Chess:
             else:
                 modify_rook_king(0)
 
+    def en_passant(self, x):
+        if self.chess_board[self.position1][1] == 'i' and self.position2 == self.en_pass_pos[0]:
+            first_empty_slot = self.captured_pieces[self.other_player].index('  ')
+            self.captured_pieces[self.other_player][first_empty_slot] = self.chess_board[self.en_pass_pos[1]]
+            # copy captured piece to captured canvas
+            self.c_captured[self.other_player].itemconfigure(
+                self.c_captured[self.other_player].find_withtag('captured_' + str(first_empty_slot)),
+                text=self.txt_map_piece(self.chess_board[self.en_pass_pos[1]][1]))
+            # get id of captured piece
+            captured_piece = self.c_chess.find_withtag(f'piece_{self.en_pass_pos[1]}')
+            print('captured id=' + str(captured_piece))
+            # delete captured piece from chess board
+            self.c_chess.delete(captured_piece)
+            self.chess_board[self.en_pass_pos[1]] = '  '
+            print('En passant!')
+        if x == 'w':
+            if self.chess_board[self.position1][1] == 'i' and self.position2[1] == '4':
+                self.en_pass_pos[0] = self.position2[0] + str(3)
+                self.en_pass_pos[1] = self.position2
+            else:
+                self.en_pass_pos = ['  ', '  ']
+        elif x == 'b':
+            if self.chess_board[self.position1][1] == 'i' and self.position2[1] == '5':
+                self.en_pass_pos[0] = self.position2[0] + str(6)
+                self.en_pass_pos[1] = self.position2
+            else:
+                self.en_pass_pos = ['  ', '  ']
+        if self.en_pass_pos != ['  ', '  ']:
+            print(f'En passant possible for {self.en_pass_pos[1]}, capture at {self.en_pass_pos[0]}')
+
     def handle_turn(self, x):
         self.selected_piece = None
         # for i in range(1, 97):
@@ -576,6 +604,7 @@ class Chess:
                 print('position2=' + self.position2)
 
                 if not self.virtual_move_results_check(x):
+                    self.en_passant(self.current_player)
                     # if capture happens
                     if self.chess_board[self.position2] != '  ':
                         first_empty_slot = self.captured_pieces[self.other_player].index('  ')
@@ -590,6 +619,7 @@ class Chess:
                         print('captured id=' + str(captured_piece))
                         # delete captured piece from chess board
                         self.c_chess.delete(captured_piece)
+                        print('Capture!')
 
                     # register first move of rook and king for castling
                     if self.chess_board[self.position1][1] == '+' or self.chess_board[self.position1][1] == 'T':
@@ -758,7 +788,11 @@ class Chess:
 
     def move_one_capture_side_one(self, dct1):      # direction up if -1, down if 1
         if self.chess_board[self.position2] == '  ':
-            if self.position1[0] == self.position2[0] and int(self.position1[1]) - int(self.position2[1]) == dct1:
+            if self.position2 == self.en_pass_pos[0] and \
+                    abs(ord(self.position2[0]) - ord(self.position1[0])) == 1 and \
+                    int(self.position1[1]) - int(self.position2[1]) == dct1:
+                return True
+            elif self.position1[0] == self.position2[0] and int(self.position1[1]) - int(self.position2[1]) == dct1:
                 return True
             return False
         elif self.chess_board[self.position2] != '  ':
