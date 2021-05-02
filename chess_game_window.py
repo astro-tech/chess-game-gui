@@ -701,13 +701,16 @@ class Chess:
                 self.display_board()
 
     def computer_turn(self, x):
-        def select_piece_dgr(player, d_dict):  # returns coordinate of the most valuable piece in d_dict
-            for p in ['+', '*', 'T', 'A', 'f', 'i']:
-                if player + p in list(d_dict.values()):
-                    return list(d_dict.keys())[list(d_dict.values()).index(player + p)]
+        values = {'+': 10, '*': 9, 'T': 5, 'A': 3, 'f': 3, 'i': 1}
 
-        def attack_worth(player, scenario):
-            values = {'+': 10, '*': 9, 'T': 5, 'A': 3, 'f': 3, 'i': 1}
+        def rank_piece_dgr(d_dict):  # returns coordinates of pieces in d_dict ranked in descending values
+            val_assign_piece_dgr = {key: values[d_dict[key][1]] for key in d_dict}
+            ranked_piece_dgr = \
+                [piece for i in range(10, 0, -1) for piece in val_assign_piece_dgr if i == val_assign_piece_dgr[piece]]
+            print(ranked_piece_dgr)
+            return ranked_piece_dgr
+
+        def attack_worth(scenario):
             if self.chess_board[self.position1][1] == 'i' and self.chess_board[self.position2][1] == 'i':
                 return True
             elif len(self.piece_dgr[scenario]) == 1:
@@ -715,7 +718,7 @@ class Chess:
                     return True
             else:
                 if values[self.chess_board[self.position1][1]] < \
-                        values[self.piece_dgr[scenario][select_piece_dgr(player, self.piece_dgr[scenario])][1]]:
+                        values[self.piece_dgr[scenario][rank_piece_dgr(self.piece_dgr[scenario])[0]][1]]:
                     return True
             return False
 
@@ -730,7 +733,7 @@ class Chess:
         print("Computer's pieces under attack: " + str(self.piece_dgr['cur']))
         if self.piece_dgr['cur']:  # if under attack: strategies 1, 2, 3
             # identifies the most valuable piece's attacker and attacks it
-            self.position2 = self.coord_danger_from(select_piece_dgr(x, self.piece_dgr['cur']), self.chess_board, x)
+            self.position2 = self.coord_danger_from(rank_piece_dgr(self.piece_dgr['cur'])[0], self.chess_board, x)
             # seeks a legal move to capture the attacker on a safe place(1st)
             for self.position1 in curr_player_pos:
                 if self.check_legal_move() and not self.virtual_move_results_check(x) and \
@@ -741,13 +744,13 @@ class Chess:
             # if not found, it tries to capture the attacker on a non-safe place if attack worth (2nd)
             if not strategy_found:
                 for self.position1 in curr_player_pos:
-                    if self.check_legal_move() and not self.virtual_move_results_check(x) and attack_worth(x, 'cur'):
+                    if self.check_legal_move() and not self.virtual_move_results_check(x) and attack_worth('cur'):
                         strategy_found = True
                         strategy = '2: Defense attack to non-safe place if worth it'
                         break
             # if not found, it tries to retreat from the threatened coordinate (3rd)
             if not strategy_found:
-                self.position1 = select_piece_dgr(x, self.piece_dgr['cur'])
+                self.position1 = rank_piece_dgr(self.piece_dgr['cur'])[0]
                 randomized_chess_board_keys = random.sample(self.chess_board_keys, len(self.chess_board_keys))
                 for self.position2 in randomized_chess_board_keys:
                     if self.chess_board[self.position2] not in [x + 'T', x + 'f', x + 'A', x + '+', x + '*', x + 'i'] \
@@ -764,20 +767,21 @@ class Chess:
                                      self.coord_danger_from(i, self.chess_board, self.other_player)}
             print("Opponent's pieces under attack: " + str(self.piece_dgr['oth']))
             if self.piece_dgr['oth']:  # attack strategies 4, 5
-                # identifies which current piece endangers the opponent's most valuable piece and selects it
-                self.position1 = self.coord_danger_from(select_piece_dgr(self.other_player, self.piece_dgr['oth']),
-                                                        self.chess_board, self.other_player)
-                # attacks opponent's most valuable piece
-                self.position2 = select_piece_dgr(self.other_player, self.piece_dgr['oth'])
-                if self.check_legal_move() and not self.virtual_move_results_check(x) and \
-                        not self.coord_danger_from(self.position2, self.chess_board, x):
-                    strategy_found = True
-                    strategy = '4: Attack to safe place'
-                # if not managed, it still tries the attack if it worth (5th)
-                elif self.check_legal_move() and not self.virtual_move_results_check(x) and \
-                        attack_worth(self.other_player, 'oth'):
-                    strategy_found = True
-                    strategy = '5: Attack to non-safe place if worth it'
+                # iterates positions of other player's pieces in danger and selects the current piece which attacks it
+                for oth_pos in rank_piece_dgr(self.piece_dgr['oth']):
+                    self.position1 = self.coord_danger_from(oth_pos, self.chess_board, self.other_player)
+                    # attacks opponent's piece in turn
+                    self.position2 = oth_pos
+                    if self.check_legal_move() and not self.virtual_move_results_check(x) and \
+                            not self.coord_danger_from(self.position2, self.chess_board, x):
+                        strategy_found = True
+                        strategy = '4: Attack to safe place'
+                        break
+                    # if not managed, it still tries the attack if it worth (5th)
+                    elif self.check_legal_move() and not self.virtual_move_results_check(x) and attack_worth('oth'):
+                        strategy_found = True
+                        strategy = '5: Attack to non-safe place if worth it'
+                        break
         # if not under attack or move not found, it tries the en passant capture (6th)
         if not strategy_found and self.en_pass_pos[0] != '  ':
             self.position1 = self.coord_danger_from(self.en_pass_pos[0], self.chess_board, self.other_player)
