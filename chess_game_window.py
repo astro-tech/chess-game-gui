@@ -15,21 +15,26 @@ class Chess:
         self.master = master
         self.master.title('Chess Game')
         self.screen_size = (1024, 576)  # other (1024, 576)(1366, 768)(1920, 1080)
+        # 2 blue edge, 50 bar and menu, 40 tray = 92
+        self.master.minsize(self.screen_size[0] - 2, self.screen_size[1] - 92)
+        self.master.maxsize(self.screen_size[0] - 2, self.screen_size[1] - 92)
+        self.master.geometry(f'{self.screen_size[0] - 2}x{self.screen_size[1] - 92}+0+0')
+
         self.square_size = int(self.screen_size[1] / 10.97)  # 70 for 1366x768
         self.canvas_widgets_color = 'grey75'
+        self.abc123_color = 'grey50'
         self.dark_squares_color = 'grey25'
         self.light_squares_color = 'grey95'
         self.dark_squares_highlight = '#800000'
         self.light_squares_highlight = '#ffc8c8'
-        self.color_abc = 'grey50'
-        self.color_123 = 'grey55'
-        self.master.minsize(self.screen_size[0] - 2, self.screen_size[1] - 92)  # 2blue edge,50bar and menu,40tray=92
-        self.master.maxsize(self.screen_size[0] - 2, self.screen_size[1] - 92)
-        self.master.geometry(f'{self.screen_size[0] - 2}x{self.screen_size[1] - 92}+0+0')
+        self.font_type = 'TKDefaultFont'
+        self.font_size = int(self.square_size / 3.5)  # 20 for 1366x768
+        self.font_color = 'black'
 
         self.create_menu()
         self.create_4_main_canvas()
         self.create_chess_board()
+        self.create_squares()
 
     def create_menu(self):
         self.master.option_add('*tearOff', False)
@@ -55,6 +60,7 @@ class Chess:
         self.separator1 = ttk.Separator(self.master, orient='vertical')
         self.separator2 = ttk.Separator(self.master, orient='horizontal')
         self.separator3 = ttk.Separator(self.master, orient='horizontal')
+
         self.c_board.grid(column=0, row=0, columnspan=1, rowspan=5, padx=5, pady=(3, 0))
         self.separator1.grid(column=1, row=0, columnspan=1, rowspan=5, sticky='n, s')
         self.c_blck_capt.grid(column=2, row=0, padx=(5, 0), pady=(3, 5))
@@ -64,25 +70,40 @@ class Chess:
         self.c_whte_capt.grid(column=2, row=4, padx=(5, 0), pady=(5, 0))
 
     def create_chess_board(self):
+        self.c_123abc_w = (self.c_board_size - self.square_size * 8) / 2    # strip width of 1-8, a-h
+
         self.c_chess = tk.Canvas(self.c_board, width=self.square_size * 8, height=self.square_size * 8,
                                  bg=self.canvas_widgets_color)
-        self.board_abc_n = tk.Canvas(self.c_board, width=self.square_size * 8,
-                                     height=(self.c_board_size - self.square_size * 8) / 2, bg=self.color_abc)
-        self.board_abc_s = tk.Canvas(self.c_board, width=self.square_size * 8,
-                                     height=(self.c_board_size - self.square_size * 8) / 2, bg=self.color_abc)
-        self.board_123_w = tk.Canvas(self.c_board, width=(self.c_board_size - self.square_size * 8) / 2,
-                                     height=self.c_board_size, bg=self.color_123)
-        self.board_123_e = tk.Canvas(self.c_board, width=(self.c_board_size - self.square_size * 8) / 2,
-                                     height=self.c_board_size, bg=self.color_123)
-        for canvas_item in [self.c_chess, self.board_abc_n, self.board_abc_s, self.board_123_w, self.board_123_e]:
-            canvas_item['highlightthickness'] = 0
-        self.board_123_w.grid(column=0, row=0, rowspan=3)
-        self.board_abc_n.grid(column=1, row=0)
-        self.c_chess.grid(column=1, row=1)
-        self.board_abc_s.grid(column=1, row=2)
-        self.board_123_e.grid(column=2, row=0, rowspan=3)
 
-        # create_squares
+        self.board_abcx2 = {}   # creating two rows of letters a-h
+        for i in ['n', 's']:
+            self.board_abcx2[i] = tk.Canvas(self.c_board, width=self.square_size * 8,
+                                            height=self.c_123abc_w, bg=self.abc123_color)
+            for j in char_range('a', 'h'):
+                self.board_abcx2[i].create_text(
+                    self.square_size * (ord(j)-96.5), self.c_123abc_w / 2,
+                    text=j, fill=self.font_color, font=(self.font_type, self.font_size))
+
+        self.board_123x2 = {}   # creating two columns of numbers 1-8
+        for i in ['w', 'e']:
+            self.board_123x2[i] = tk.Canvas(self.c_board, width=self.c_123abc_w,
+                                            height=self.c_board_size, bg=self.abc123_color)
+            for j in range(0, 8):
+                self.board_123x2[i].create_text(
+                    self.c_123abc_w / 2, self.c_board_size - self.c_123abc_w - self.square_size * (j + 0.5),
+                    text=j+1, fill=self.font_color, font=(self.font_type, self.font_size))
+
+        for canvas_item in [self.c_chess, self.board_abcx2['n'], self.board_abcx2['s'],
+                            self.board_123x2['w'], self.board_123x2['e']]:
+            canvas_item['highlightthickness'] = 0
+
+        self.board_123x2['w'].grid(column=0, row=0, rowspan=3)
+        self.board_abcx2['n'].grid(column=1, row=0)
+        self.c_chess.grid(column=1, row=1)
+        self.board_abcx2['s'].grid(column=1, row=2)
+        self.board_123x2['e'].grid(column=2, row=0, rowspan=3)
+
+    def create_squares(self):
         self.chess_keys = []
         for number in range(8, 0, -1):
             for letter in char_range('a', 'h'):
@@ -103,6 +124,8 @@ class Chess:
             # e not used but always created as event, so a new kw parameter n is created which is local to lambda
             self.c_chess.tag_bind(i, '<Button-1>', lambda e, n=i: print(n))
 
+        self.c_chess.itemconfigure('square', state=tk.DISABLED)
+        self.master.after(4000, lambda: self.c_chess.itemconfigure('square', state=tk.NORMAL))
 
 
 if __name__ == '__main__':
