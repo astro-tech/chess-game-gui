@@ -50,7 +50,8 @@ class Chess:
         self.chess_board_virtual = None
         self.c_chess = None
         self.currently_selected = tk.StringVar()
-        self.show_legal_moves = tk.BooleanVar(value=True)
+        self.show_legal_moves_man = tk.BooleanVar(value=True)
+        self.show_legal_moves_computer = tk.BooleanVar(value=False)
         self.file_to_load = 'initial_setup.txt'
         self.c = {}  # dictionary for gui elements created later and used for multiple methods
         self.bak = {}  # dictionary for backups
@@ -113,14 +114,17 @@ class Chess:
         self.master['menu'] = main_menu
         file_menu = tk.Menu(main_menu)
         options_menu = tk.Menu(main_menu)
+        help_menu = tk.Menu(main_menu)
         main_menu.add_cascade(label='File', menu=file_menu, underline=0)
         main_menu.add_cascade(label='Options', menu=options_menu, underline=0)
+        main_menu.add_cascade(label='Help', menu=help_menu, underline=0)
         file_menu.add_command(label='New Game', command=self.new_game)
         file_menu.add_command(label='Load Game', command=self.load_game)
         file_menu.add_command(label='Save Game', command=self.save_game)
         file_menu.add_separator()
         file_menu.add_command(label='Exit', command=self.exit_game)
         options_menu.add_command(label='Settings', command=self.settings_dialog)
+        help_menu.add_command(label='About')
 
         self.c['castling_menu'] = tk.Menu(self.master)  # context menu
         self.c['castling_menu'].add_command(label='Castling', command=self.castling)
@@ -195,7 +199,8 @@ class Chess:
                 exiting()
 
     def settings_dialog(self):
-        show_legal_moves2 = tk.BooleanVar(value=self.show_legal_moves.get())
+        show_legal_moves_man2 = tk.BooleanVar(value=self.show_legal_moves_man.get())
+        show_legal_moves_cmp2 = tk.BooleanVar(value=self.show_legal_moves_computer.get())
         number_of_player2 = tk.IntVar(value=self.number_of_player.get())
         settings_selected = tk.BooleanVar()
 
@@ -207,30 +212,34 @@ class Chess:
         settings_frame = ttk.Frame(settings_window, padding=10)
         settings_frame.grid(column=0, row=0, sticky='n, w, e, s')
 
-        self.c['msg0'] = ttk.Label(settings_frame, text='Dual player mode:', padding=5)
-        self.c['msg1'] = ttk.Label(settings_frame, text='Single player mode with computer:', padding=5)
-        self.c['msg2'] = ttk.Label(settings_frame, text='No player (computer plays only for demonstration):', padding=5)
-        self.c['msg3'] = ttk.Label(settings_frame, text='Highlight legal movement squares with green:', padding=5)
+        self.c['msg0'] = ttk.Label(settings_frame, text='Dual player mode (man-man):', padding=5)
+        self.c['msg1'] = ttk.Label(settings_frame, text='Single player mode (man-computer):', padding=5)
+        self.c['msg2'] = ttk.Label(settings_frame, text='No player mode (computer-computer) for demo:', padding=5)
+        self.c['msg3'] = ttk.Label(settings_frame, text='Highlight legal movement squares for player:', padding=5)
+        self.c['msg4'] = ttk.Label(settings_frame, text='Highlight legal movement squares for computer:', padding=5)
         self.c['button0'] = ttk.Radiobutton(settings_frame, variable=number_of_player2, value=2, padding=5)
         self.c['button1'] = ttk.Radiobutton(settings_frame, variable=number_of_player2, value=1, padding=5)
         self.c['button2'] = ttk.Radiobutton(settings_frame, variable=number_of_player2, value=0, padding=5)
         self.c['button3'] = \
-            ttk.Checkbutton(settings_frame, variable=show_legal_moves2, onvalue=True, offvalue=False, padding=5)
-        for i in [0, 1, 2, 3]:
+            ttk.Checkbutton(settings_frame, variable=show_legal_moves_man2, onvalue=True, offvalue=False, padding=5)
+        self.c['button4'] = \
+            ttk.Checkbutton(settings_frame, variable=show_legal_moves_cmp2, onvalue=True, offvalue=False, padding=5)
+        for i in [0, 1, 2, 3, 4]:
             self.c['msg' + str(i)].grid(column=0, row=i, columnspan=3, sticky='n, w')
             self.c['button' + str(i)].grid(column=3, row=i, sticky='n, e')
 
         def apply_button_logic():
-            self.show_legal_moves.set(show_legal_moves2.get())
+            self.show_legal_moves_man.set(show_legal_moves_man2.get())
+            self.show_legal_moves_computer.set(show_legal_moves_cmp2.get())
             self.number_of_player.set(number_of_player2.get())
             settings_selected.set(True)
 
         apply_button = ttk.Button(settings_frame, text='Apply', command=apply_button_logic)
         cancel_button = ttk.Button(settings_frame, text='Cancel', command=lambda: settings_selected.set(True))
-        apply_button.grid(column=2, row=4, sticky='n, e, s')
-        cancel_button.grid(column=3, row=4, sticky='n, s')
+        apply_button.grid(column=2, row=5, sticky='n, e, s')
+        cancel_button.grid(column=3, row=5, sticky='n, s')
 
-        root.wait_variable(settings_selected)
+        self.master.wait_variable(settings_selected)
         settings_window.destroy()
 
     def load_board_setup(self):
@@ -661,7 +670,7 @@ class Chess:
 
             self.c_chess.itemconfigure('piece', state=tk.DISABLED)  # initialize select square
             valid_position2s = self.generate_valid_position2(x)  # activate only valid movement squares
-            if self.show_legal_moves.get():
+            if self.show_legal_moves_man.get():
                 color_number = 2
             else:
                 color_number = 0
@@ -917,6 +926,16 @@ class Chess:
             print('Capture! captured id=' + str(captured_piece))
             self.master.after(self.game_speed * 2, lambda: self.c_chess.delete(captured_piece))
 
+        if self.show_legal_moves_computer.get():
+            position2 = self.position2
+            valid_position2s = self.generate_valid_position2(x)
+            for i in valid_position2s:
+                self.master.after(self.game_speed, lambda pos=i: self.c_chess.itemconfigure(
+                    'square_' + pos, fill=self.pos_map_color(pos)[2]))
+                self.master.after(self.game_speed * 2, lambda pos=i: self.c_chess.itemconfigure(
+                    'square_' + pos, fill=self.pos_map_color(pos)[0]))
+            self.position2 = position2
+
         self.chess_board[self.position2] = self.chess_board[self.position1]
         self.chess_board[self.position1] = '  '
         selected_piece = self.c_chess.find_withtag(f'piece_{self.position1}')  # get id of selected piece
@@ -1006,7 +1025,7 @@ class Chess:
         ok_button = ttk.Button(promotion_frame, text='Select', command=lambda: promotion_selected.set(True))
         ok_button.grid(column=3, row=2, sticky='n, w, e, s')
 
-        root.wait_variable(promotion_selected)
+        self.master.wait_variable(promotion_selected)
         promotion_window.destroy()
 
         self.chess_board[self.promotion_coordinate(x)] = x + button_value.get()  # set backend
