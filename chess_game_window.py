@@ -9,6 +9,13 @@ def char_range(c1, c2):  # stackoverflow.com/questions/7001144/range-over-charac
         yield chr(c)
 
 
+def measure_dist(pos1, pos2):
+    x_dist = abs(ord(pos2[0]) - ord(pos1[0]))
+    y_dist = abs(int(pos2[1]) - int(pos1[1]))
+    dist = (x_dist ** 2 + y_dist ** 2) ** 0.5
+    return float(round(dist, 1))
+
+
 class Chess:
     def __init__(self, master):
         self.master = master
@@ -791,13 +798,18 @@ class Chess:
                 strategy = '6: Attack with En passant'
         # if not under attack or previous moves not found, it tries to move to a safe place (7th)
         if not strategy_found:
-            safe_position2s = [i for i in self.chess_board_keys if not self.coord_danger_from(i, self.chess_board, x)]
-            randomized_safe_position2s = random.sample(safe_position2s, len(safe_position2s))
+            safe_position2s = [i for i in self.chess_board_keys if not self.coord_danger_from(i, self.chess_board, x)
+                               and self.chess_board[i] not in [x + 'T', x + 'f', x + 'A', x + '+', x + '*', x + 'i']]
+            oth_king_pos = None
+            for i in self.chess_board_keys:
+                if self.chess_board[i] == self.other_player + '+':
+                    oth_king_pos = i
+            dist_add_pos2s = {pos: measure_dist(oth_king_pos, pos) for pos in safe_position2s}
+            dist_ordered_pos2s = [pos for i in range(1, 101) for pos in dist_add_pos2s if dist_add_pos2s[pos] == i / 10]
             randomized_curr_player_pos = random.sample(curr_player_pos, len(curr_player_pos))
             for self.position1 in randomized_curr_player_pos:
-                for self.position2 in randomized_safe_position2s:
-                    if self.chess_board[self.position2] not in [x + 'T', x + 'f', x + 'A', x + '+', x + '*', x + 'i'] \
-                            and self.check_legal_move() and not self.virtual_move_results_check(x):
+                for self.position2 in dist_ordered_pos2s:
+                    if self.check_legal_move() and not self.virtual_move_results_check(x):
                         strategy_found = True
                         strategy = '7: Move to safe place'
                         break
@@ -817,7 +829,6 @@ class Chess:
                 else:
                     continue
                 break
-        # todo
         print('Strategy ' + strategy)
         print('Moving from: ' + self.position1)
         print('Moving to: ' + self.position2)
