@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 
 
 # from https://stackoverflow.com/questions/7001144/range-over-character-in-python
@@ -41,13 +41,14 @@ class Chess:
 
         self.currently_selected = tk.StringVar()
         self.start_new_game = True
+        self.file_to_load = 'initial_setup.txt'
 
         while self.start_new_game:
             self.play_game()
 
     def play_game(self):
         self.clear_previous_session()
-        self.load_board_setup('initial_setup.txt')
+        self.load_board_setup()
         self.draw_menu()
         self.draw_4_main_canvas()
         self.draw_chess_board()
@@ -117,29 +118,33 @@ class Chess:
                 print(self.captured_pieces['w'][i])
         print('-----------------------------------------------')
 
-    def load_board_setup(self, filename):
-        file = open(filename, 'r')
-        data = file.read().splitlines()
-        for line in data[0:64]:
-            (key, value) = line.split('=')
-            self.chess_board[key] = value  # importing full chess board data (old generate board)
-        for color in ['w', 'b']:
-            self.captured_pieces[color] = []
-        for line in data[65:81]:
-            value = line.split('=')[1]
-            self.captured_pieces['w'].append(value)  # importing captures white pieces data
-        for line in data[81:97]:
-            value = line.split('=')[1]
-            self.captured_pieces['b'].append(value)  # importing captures black pieces data
-        current_player_line = data[97]
-        current_player_value = current_player_line.split('=')[1]
-        self.current_player = current_player_value
-        other_player_line = data[98]
-        other_player_value = other_player_line.split('=')[1]
-        self.other_player = other_player_value
-        file.close()
-        self.chess_board_keys = list(self.chess_board.keys())
-        # print(self.captured_pieces)
+    def load_board_setup(self):
+        try:
+            file = open(self.file_to_load, 'r')
+            data = file.read().splitlines()
+            for line in data[0:64]:
+                (key, value) = line.split('=')
+                self.chess_board[key] = value  # importing full chess board data (old generate board)
+            for color in ['w', 'b']:
+                self.captured_pieces[color] = []
+            for line in data[65:81]:
+                value = line.split('=')[1]
+                self.captured_pieces['w'].append(value)  # importing captures white pieces data
+            for line in data[81:97]:
+                value = line.split('=')[1]
+                self.captured_pieces['b'].append(value)  # importing captures black pieces data
+            current_player_line = data[97]
+            current_player_value = current_player_line.split('=')[1]
+            self.current_player = current_player_value
+            other_player_line = data[98]
+            other_player_value = other_player_line.split('=')[1]
+            self.other_player = other_player_value
+            file.close()
+            self.chess_board_keys = list(self.chess_board.keys())
+            # print(self.captured_pieces)
+        except FileNotFoundError as error:
+            self.master.after(5000, print(error))
+            self.master.destroy()
 
     def draw_menu(self):
         self.master.option_add('*tearOff', False)
@@ -150,7 +155,7 @@ class Chess:
         self.chess_menu.add_cascade(label='File', menu=self.file_menu, underline=0)
         self.chess_menu.add_cascade(label='Options', menu=self.options_menu, underline=0)
         self.file_menu.add_command(label='New Game', command=self.new_game)
-        self.file_menu.add_command(label='Load Game')
+        self.file_menu.add_command(label='Load Game', command=self.load_game)
         self.file_menu.add_command(label='Save Game')
         self.file_menu.add_separator()
         self.file_menu.add_command(label='Exit', command=self.exit_game)
@@ -160,8 +165,17 @@ class Chess:
         new_response = tk.messagebox.askyesno(title='New game', message='Do you want to start new game?')
         if new_response:
             self.game_still_going = False
+            self.file_to_load = 'initial_setup.txt'
             self.currently_selected.set('exit')
             print('Setting up new game')
+
+    def load_game(self):
+        path = tk.filedialog.askopenfilename(filetypes=[('Text Documents', '*.txt')])
+        if path:
+            self.game_still_going = False
+            self.file_to_load = path
+            self.currently_selected.set('exit')
+            print('Loading game from file')
 
     def exit_game(self):
         exit_response = tk.messagebox.askyesno(title='Quit game', message='Do you want to exit game?')
@@ -823,6 +837,7 @@ class Chess:
                 self.master.destroy()
             else:
                 print('Setting up new game')
+                self.file_to_load = 'initial_setup.txt'
 
 
 if __name__ == '__main__':
