@@ -29,7 +29,7 @@ class Chess:
         self.dark_squares_color = '#7d564a'
         self.dark_squares_highlight = '#be3625'
         # piece parameters
-        self.piece_size = int(self.square_size * (5 / 7))   # 50 for 1366x768
+        self.piece_size = int(self.square_size * (5 / 7))  # 50 for 1366x768
         self.light_piece_color = '#d2ac79'
         self.light_piece_highlight = '#f4541e'
         self.dark_piece_color = '#2a1510'
@@ -95,7 +95,7 @@ class Chess:
         self.draw_captured()
         self.draw_captured_pieces()
         self.draw_squares()
-        self.initialize_pieces()    # draw included
+        self.initialize_pieces()  # draw included
         self.play_dual()
 
     def load_board_setup(self, filename):
@@ -103,15 +103,15 @@ class Chess:
         data = file.read().splitlines()
         for line in data[0:64]:
             (key, value) = line.split('=')
-            self.chess_board[key] = value   # importing full chess board data (old generate board)
+            self.chess_board[key] = value  # importing full chess board data (old generate board)
         for color in ['w', 'b']:
             self.captured_pieces[color] = []
         for line in data[65:81]:
             value = line.split('=')[1]
-            self.captured_pieces['w'].append(value)     # importing captures white pieces data
+            self.captured_pieces['w'].append(value)  # importing captures white pieces data
         for line in data[81:97]:
             value = line.split('=')[1]
-            self.captured_pieces['b'].append(value)     # importing captures black pieces data
+            self.captured_pieces['b'].append(value)  # importing captures black pieces data
         current_player_line = data[97]
         current_player_value = current_player_line.split('=')[1]
         self.current_player = current_player_value
@@ -156,35 +156,35 @@ class Chess:
         self.c_right_bottom.grid(column=2, row=4, padx=(5, 0), pady=(5, 0))
 
         self.current_player_label = self.c_right_center.create_text(
-                                    self.c_right_width / 2, self.c_right_center_height / 2,
-                                    text='White is next to move', fill=self.font_color,
-                                    font=(self.font_type, self.font_size))
+            self.c_right_width / 2, self.c_right_center_height / 2,
+            text='White is next to move', fill=self.font_color,
+            font=(self.font_type, self.font_size))
 
         self.master.bind('<Button-3>', lambda e: self.reset_selection())
 
     def draw_chess_board(self):
-        self.c_123abc_w = (self.c_left_side - self.square_size * 8) / 2    # strip width of 1-8, a-h
+        self.c_123abc_w = (self.c_left_side - self.square_size * 8) / 2  # strip width of 1-8, a-h
 
         self.c_chess = tk.Canvas(self.c_left, width=self.square_size * 8, height=self.square_size * 8,
                                  bg=self.canvas_widgets_color)
 
-        self.board_abcx2 = {}   # creating two rows of letters a-h
+        self.board_abcx2 = {}  # creating two rows of letters a-h
         for i in ['n', 's']:
             self.board_abcx2[i] = tk.Canvas(self.c_left, width=self.square_size * 8,
                                             height=self.c_123abc_w, bg=self.abc123_color)
             for j in char_range('a', 'h'):
                 self.board_abcx2[i].create_text(
-                    self.square_size * (ord(j)-96.5), self.c_123abc_w / 2,
+                    self.square_size * (ord(j) - 96.5), self.c_123abc_w / 2,
                     text=j, fill=self.font_color, font=(self.font_type, self.font_size))
 
-        self.board_123x2 = {}   # creating two columns of numbers 1-8
+        self.board_123x2 = {}  # creating two columns of numbers 1-8
         for i in ['w', 'e']:
             self.board_123x2[i] = tk.Canvas(self.c_left, width=self.c_123abc_w,
                                             height=self.c_left_side, bg=self.abc123_color)
             for j in range(0, 8):
                 self.board_123x2[i].create_text(
                     self.c_123abc_w / 2, self.c_left_side - self.c_123abc_w - self.square_size * (j + 0.5),
-                    text=j+1, fill=self.font_color, font=(self.font_type, self.font_size))
+                    text=j + 1, fill=self.font_color, font=(self.font_type, self.font_size))
 
         for canvas_item in [self.c_chess, self.board_abcx2['n'], self.board_abcx2['s'],
                             self.board_123x2['w'], self.board_123x2['e']]:
@@ -243,7 +243,7 @@ class Chess:
             y0 = abs(int(i[1]) - 8) * self.square_size
             x1 = (ord(i[0]) - 96) * self.square_size
             y1 = abs(int(i[1]) - 9) * self.square_size
-            if (ord(i[0]) + int(i[1])) % 2 == 0:    # True if dark square, False if light square
+            if (ord(i[0]) + int(i[1])) % 2 == 0:  # True if dark square, False if light square
                 color = self.dark_squares_color
                 act_color = self.dark_squares_highlight
             else:
@@ -319,19 +319,22 @@ class Chess:
             print('Black is next to move')
             self.c_right_center.itemconfigure(self.current_player_label, text='Black is next to move')
 
-        self.c_chess.itemconfigure('piece', state=tk.DISABLED)      # initialize select piece
+        self.c_chess.itemconfigure('piece', state=tk.DISABLED)  # initialize select piece
         self.c_chess.itemconfigure('square', state=tk.DISABLED)
         self.c_chess.itemconfigure(x, state=tk.NORMAL)
         print('waiting for position1')
         self.c_chess.wait_variable(self.currently_selected)
         self.position1 = self.currently_selected.get()
         print('position1=' + self.position1)
-        self.selected_piece = self.c_chess.find_withtag(f'piece_{self.position1}')   # get id of selected piece
+        self.selected_piece = self.c_chess.find_withtag(f'piece_{self.position1}')  # get id of selected piece
         print('id=' + str(self.selected_piece))
-        self.c_chess.itemconfigure(self.selected_piece, fill=self.txt_map_color(x)[1])     # set constant red
+        self.c_chess.itemconfigure(self.selected_piece, fill=self.txt_map_color(x)[1])  # set constant red
 
-        self.c_chess.itemconfigure('piece', state=tk.DISABLED)      # initialize select square
-        self.c_chess.itemconfigure('square', state=tk.NORMAL)
+        self.c_chess.itemconfigure('piece', state=tk.DISABLED)  # initialize select square
+
+        for i in self.generate_valid_position2(x):              # only valid movement squares are active
+            self.c_chess.itemconfigure('square_' + i, state=tk.NORMAL)
+
         print('waiting for position2')
         # in this timeframe there's possibility to reset selection
         self.c_chess.wait_variable(self.currently_selected)
@@ -343,6 +346,7 @@ class Chess:
                 first_empty_slot = self.captured_pieces[self.other_player].index('  ')
                 # backend, copying position2 piece to other player's captured list
                 self.captured_pieces[self.other_player][first_empty_slot] = self.chess_board[self.position2]
+
                 # copy captured piece to captured canvas
                 self.c_captured[self.other_player].itemconfigure(
                     self.c_captured[self.other_player].find_withtag('captured_' + str(first_empty_slot)),
@@ -356,11 +360,11 @@ class Chess:
             self.chess_board[self.position2] = self.chess_board[self.position1]
             self.chess_board[self.position1] = '  '
 
-            self.c_chess.coords(self.selected_piece, self.get_square_center(self.position2))    # moving piece
+            self.c_chess.coords(self.selected_piece, self.get_square_center(self.position2))  # moving piece
             self.c_chess.itemconfigure(self.selected_piece, fill=self.txt_map_color(x)[0])  # set original color
             print('old tags=' + str(self.c_chess.gettags(self.selected_piece)))
             self.c_chess.itemconfigure(self.selected_piece,
-                                       tag=('piece', f'piece_{self.position2}', x))     # update tag of piece
+                                       tag=('piece', f'piece_{self.position2}', x))  # update tag of piece
             print('new tags=' + str(self.c_chess.gettags(self.selected_piece)))
             self.selected_piece = None
 
@@ -369,7 +373,7 @@ class Chess:
         if self.selected_piece is not None:
             self.c_chess.itemconfigure(self.selected_piece, fill=self.txt_map_color(self.current_player)[0])
             self.selected_piece = None
-            self.currently_selected.set('reset')    # substitute anticipated position2 with a reset flag
+            self.currently_selected.set('reset')  # substitute anticipated position2 with a reset flag
 
     def flip_player(self):
         if self.currently_selected.get() != 'reset':
@@ -381,6 +385,157 @@ class Chess:
                 self.other_player = 'b'
         else:
             print('reset occurred, not flipping player')
+
+    def generate_valid_position2(self, x):
+        valid_position2 = []
+        for j in self.chess_board_keys:
+            self.position2 = j
+            if self.check_game_rules() and \
+                    self.chess_board[self.position2] not in [x + 'T', x + 'f', x + 'A', x + '+', x + '*', x + 'i']:
+                valid_position2.append(j)
+        return valid_position2
+
+    def check_game_rules(self):
+        if self.chess_board[self.position1] in ['wT', 'bT']:
+            return self.movement_valid_rook()
+        if self.chess_board[self.position1] in ['wA', 'bA']:
+            return self.movement_valid_bishop()
+        if self.chess_board[self.position1] in ['w*', 'b*']:
+            return self.movement_valid_queen()
+        if self.chess_board[self.position1] in ['w+', 'b+']:
+            return self.movement_valid_king()
+        if self.chess_board[self.position1] in ['wf', 'bf']:
+            return self.movement_valid_knight()
+        if self.chess_board[self.position1] in ['wi']:
+            return self.movement_valid_w_pawn()
+        if self.chess_board[self.position1] in ['bi']:
+            return self.movement_valid_b_pawn()
+
+    def movement_valid_rook(self):
+        if self.check_movement_cols_rows() and self.check_obstacle_cols_rows():
+            return True
+        return False
+
+    def movement_valid_bishop(self):
+        if self.check_movement_diagonals() and self.check_obstacle_diagonals():
+            return True
+        return False
+
+    def movement_valid_queen(self):
+        if (self.check_movement_cols_rows() or self.check_movement_diagonals()) \
+                and (self.check_obstacle_cols_rows() or self.check_obstacle_diagonals()):
+            return True
+        return False
+
+    def movement_valid_king(self):
+        if self.max1step_all_direction():
+            return True
+        return False
+
+    def movement_valid_knight(self):
+        if self.movement_in_l_shape():
+            return True
+        return False
+
+    def movement_valid_w_pawn(self):
+        if self.step_up_or_hit_side_up() or self.first_step_2up():
+            return True
+        return False
+
+    def movement_valid_b_pawn(self):
+        if self.step_down_or_hit_side_down() or self.first_step_2down():
+            return True
+        return False
+
+    # movement analysis from here
+    def check_movement_cols_rows(self):
+        if self.position1[0] == self.position2[0] or self.position1[1] == self.position2[1]:
+            return True
+        return False
+
+    def check_movement_diagonals(self):
+        if abs(ord(self.position1[0]) - ord(self.position2[0])) == \
+                abs(int(self.position1[1]) - int(self.position2[1])):
+            return True
+        return False
+
+    def check_obstacle_cols_rows(self):
+        if self.position1[0] == self.position2[0]:
+            for i in range(1, abs(int(self.position2[1]) - int(self.position1[1]))):
+                if self.chess_board[self.position1[0] + str(min(int(self.position1[1]),
+                                                                int(self.position2[1])) + i)] != '  ':
+                    return False
+            return True
+        elif self.position1[1] == self.position2[1]:
+            for i in range(1, abs(ord(self.position2[0]) - ord(self.position1[0]))):
+                if self.chess_board[chr(min(ord(self.position1[0]),
+                                            ord(self.position2[0])) + i) + self.position1[1]] != '  ':
+                    return False
+            return True
+
+    def check_obstacle_diagonals(self):
+        if ord(self.position1[0]) - ord(self.position2[0]) == int(self.position1[1]) - int(self.position2[1]):
+            for i in range(1, abs(int(self.position2[1]) - int(self.position1[1]))):
+                if self.chess_board[chr(min(ord(self.position1[0]), ord(self.position2[0])) + i) +
+                                    str(min(int(self.position1[1]), int(self.position2[1])) + i)] != '  ':
+                    return False
+            return True
+        elif ord(self.position1[0]) - ord(self.position2[0]) == (int(self.position1[1]) - int(self.position2[1])) * -1:
+            for i in range(1, abs(int(self.position2[1]) - int(self.position1[1]))):
+                if self.chess_board[chr(min(ord(self.position1[0]), ord(self.position2[0])) + i) +
+                                    str(max(int(self.position1[1]), int(self.position2[1])) - i)] != '  ':
+                    return False
+            return True
+
+    def max1step_all_direction(self):
+        if abs(ord(self.position2[0]) - ord(self.position1[0])) < 2 and abs(
+                int(self.position2[1]) - int(self.position1[1])) < 2:
+            return True
+        return False
+
+    def movement_in_l_shape(self):
+        if (abs(ord(self.position2[0]) - ord(self.position1[0])) == 1 and abs(
+                int(self.position2[1]) - int(self.position1[1])) == 2) or \
+                (abs(ord(self.position2[0]) - ord(self.position1[0])) == 2 and abs(
+                    int(self.position2[1]) - int(self.position1[1])) == 1):
+            return True
+        return False
+
+    def step_up_or_hit_side_up(self):
+        if self.chess_board[self.position2] == '  ':
+            if self.position1[0] == self.position2[0] and int(self.position1[1]) - int(self.position2[1]) == -1:
+                return True
+            return False
+        elif self.chess_board[self.position2] != '  ':
+            if abs(ord(self.position2[0]) - ord(self.position1[0])) == 1 and \
+                    int(self.position1[1]) - int(self.position2[1]) == -1:
+                return True
+            return False
+
+    def step_down_or_hit_side_down(self):
+        if self.chess_board[self.position2] == '  ':
+            if self.position1[0] == self.position2[0] and int(self.position1[1]) - int(self.position2[1]) == 1:
+                return True
+            return False
+        elif self.chess_board[self.position2] != '  ':
+            if abs(ord(self.position2[0]) - ord(self.position1[0])) == 1 and \
+                    int(self.position1[1]) - int(self.position2[1]) == 1:
+                return True
+            return False
+
+    def first_step_2up(self):
+        if int(self.position1[1]) == 2 and self.chess_board[self.position2] == '  ' and \
+                self.chess_board[self.position2[0] + str(3)] == '  ':
+            if self.position1[0] == self.position2[0] and int(self.position1[1]) - int(self.position2[1]) == -2:
+                return True
+            return False
+
+    def first_step_2down(self):
+        if int(self.position1[1]) == 7 and self.chess_board[self.position2] == '  ' and \
+                self.chess_board[self.position2[0] + str(6)] == '  ':
+            if self.position1[0] == self.position2[0] and int(self.position1[1]) - int(self.position2[1]) == 2:
+                return True
+            return False
 
 
 if __name__ == '__main__':
