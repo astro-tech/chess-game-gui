@@ -23,20 +23,49 @@ class Chess:
         self.square_size = int(self.screen_size[1] / 10.97)  # 70 for 1366x768
         self.canvas_widgets_color = 'grey75'
         self.abc123_color = 'grey50'
-        self.dark_squares_color = 'grey25'
-        self.light_squares_color = 'grey95'
-        self.dark_squares_highlight = '#800000'
-        self.light_squares_highlight = '#ffc8c8'
         self.font_type = 'TKDefaultFont'
         self.font_size = int(self.square_size / 3.5)  # 20 for 1366x768
         self.font_color = 'black'
+        self.light_squares_color = '#fef0d6' #'grey95'
+        self.light_squares_highlight = '#ffc8c8'
+        self.dark_squares_color = '#7d564a' #'grey25'
+        self.dark_squares_highlight = '#800000'
 
-        self.create_menu()
-        self.create_4_main_canvas()
-        self.create_chess_board()
-        self.create_squares()
+        self.light_piece_color = '#d2ac79'
+        self.light_piece_highlight = self.light_squares_highlight
+        self.dark_piece_color = '#2a1510'
+        self.dark_piece_highlight = self.dark_squares_highlight
+        self.piece_size = int(self.font_size*2.5)
 
-    def create_menu(self):
+        self.generate_board()
+        self.load_initial_setup()
+        self.draw_menu()
+        self.draw_4_main_canvas()
+        self.draw_chess_board()
+        self.draw_squares()
+        self.draw_pieces()
+
+    def generate_board(self):
+        self.chess_keys = []
+        for number in range(8, 0, -1):
+            for letter in char_range('a', 'h'):
+                self.chess_keys.append(letter + str(number))
+        self.chess_values = ['  ' for i in range(64)]
+        zipped = list(zip(self.chess_keys, self.chess_values))
+        self.chess_board = {}
+        self.chess_board.update(zipped)
+        # print(self.chess_board)
+
+    def load_initial_setup(self):
+        self.file = open('initial_setup.txt', 'r')
+        self.data = self.file.read().splitlines()
+        for line in self.data:
+            (key, value) = line.split('=')
+            self.chess_board[key] = value
+        self.file.close()
+        # print(self.chess_board)
+
+    def draw_menu(self):
         self.master.option_add('*tearOff', False)
         self.chess_menu = tk.Menu(self.master)
         self.master['menu'] = self.chess_menu
@@ -44,7 +73,7 @@ class Chess:
         self.chess_menu.add_cascade(label='File', menu=self.file_menu, underline=0)
         self.file_menu.add_command(label='Board size')
 
-    def create_4_main_canvas(self):
+    def draw_4_main_canvas(self):
         self.c_board_size = self.screen_size[1] - 100  # 92 plus 3 + 5
         self.c_col2_width = self.screen_size[0] - self.c_board_size - 24  # 2blue edge,12separator, 5,5 pad x
         self.c_curr_plyr_h = self.c_board_size / 4
@@ -69,7 +98,7 @@ class Chess:
         self.separator3.grid(column=2, row=3, sticky='w, e')
         self.c_whte_capt.grid(column=2, row=4, padx=(5, 0), pady=(5, 0))
 
-    def create_chess_board(self):
+    def draw_chess_board(self):
         self.c_123abc_w = (self.c_board_size - self.square_size * 8) / 2    # strip width of 1-8, a-h
 
         self.c_chess = tk.Canvas(self.c_board, width=self.square_size * 8, height=self.square_size * 8,
@@ -103,11 +132,7 @@ class Chess:
         self.board_abcx2['s'].grid(column=1, row=2)
         self.board_123x2['e'].grid(column=2, row=0, rowspan=3)
 
-    def create_squares(self):
-        self.chess_keys = []
-        for number in range(8, 0, -1):
-            for letter in char_range('a', 'h'):
-                self.chess_keys.append(letter + str(number))
+    def draw_squares(self):
         for i in self.chess_keys:
             x0 = (ord(i[0]) - 97) * self.square_size
             y0 = abs(int(i[1]) - 8) * self.square_size
@@ -124,8 +149,45 @@ class Chess:
             # e not used but always created as event, so a new kw parameter n is created which is local to lambda
             self.c_chess.tag_bind(i, '<Button-1>', lambda e, n=i: print(n))
 
-        self.c_chess.itemconfigure('square', state=tk.DISABLED)
-        self.master.after(4000, lambda: self.c_chess.itemconfigure('square', state=tk.NORMAL))
+    def get_center(self, tag):
+        x0 = self.c_chess.coords(self.c_chess.find_withtag(tag))[0]
+        y0 = self.c_chess.coords(self.c_chess.find_withtag(tag))[1]
+        x1 = self.c_chess.coords(self.c_chess.find_withtag(tag))[2]
+        y1 = self.c_chess.coords(self.c_chess.find_withtag(tag))[3]
+        xc = (x0 + x1) / 2
+        yc = (y0 + y1) / 2
+        return xc, yc
+
+    def txt_map_piece(self, txt):
+        if txt == 'T':
+            return '♜'
+        elif txt == 'f':
+            return '♞'
+        elif txt == 'A':
+            return '♝'
+        elif txt == '+':
+            return '♚'
+        elif txt == '*':
+            return '♛'
+        elif txt == 'i':
+            return '♟'
+
+    def txt_map_color(self, txt):
+        if txt == 'w':
+            return self.light_piece_color, self.light_piece_highlight
+        elif txt == 'b':
+            return self.dark_piece_color, self.dark_piece_highlight
+
+    def draw_pieces(self):
+        for i in self.chess_board:
+            if self.chess_board[i] != '  ':
+                self.c_chess.create_text(
+                    self.get_center(i),
+                    text=self.txt_map_piece(self.chess_board[i][1]),
+                    tag=('piece', i),
+                    fill=self.txt_map_color(self.chess_board[i][0])[0],
+                    activefill=self.txt_map_color(self.chess_board[i][0])[1],
+                    font=(self.font_type, self.piece_size))
 
 
 if __name__ == '__main__':
